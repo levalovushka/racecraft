@@ -6,6 +6,7 @@
 - [docs/MECHANICS.md](docs/MECHANICS.md) — механика гонки: регламент, бокс, фазы, поведение поля, цифры из данных.
 - [docs/BOARD.md](docs/BOARD.md) — концепция доски менеджера.
 - [docs/EDGES.md](docs/EDGES.md) — где искать время относительно поля.
+- [docs/CONSTRAINTS.md](docs/CONSTRAINTS.md) — технические ограничения: связь, задержка тайминга, номера транспондера и шасси.
 - [docs/GLOSSARY.md](docs/GLOSSARY.md) — словарь.
 
 ## Источник данных: timing.batyrshin.name
