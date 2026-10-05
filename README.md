@@ -7,6 +7,7 @@
 - [docs/BOARD.md](docs/BOARD.md) — концепция доски менеджера.
 - [docs/EDGES.md](docs/EDGES.md) — где искать время относительно поля.
 - [docs/CONSTRAINTS.md](docs/CONSTRAINTS.md) — технические ограничения: связь, задержка тайминга, номера транспондера и шасси.
+- [docs/SIMULATOR.md](docs/SIMULATOR.md) — симулятор менеджера: спецификация.
 - [docs/GLOSSARY.md](docs/GLOSSARY.md) — словарь.
 
 ## Источник данных: timing.batyrshin.name
@@ -21,4 +22,10 @@
 scripts/fetch_season.sh 16 14     # скачать заезды в data/heats
 python3 racecraft/timing_parse.py # → data/races.json
 python3 scripts/season_stats.py   # разброс картов, питы, конвейер бокса
+python3 scripts/stage_stats.py    # Премиум по этапам: круг, потеря на пите, сдвиг фазы
+python3 scripts/build_track.py tracks/premium.svg tracks/premium-std.json  # конфиг трассы
 ```
+Зависимости: `pip install -r requirements.txt`.
+
+## Трассы
+`tracks/premium.svg` — текущая конфигурация Премиума (траектория, пит-лейн, линия отсечки, зоны обгона), `tracks/premium-std.json` — собранный конфиг для симулятора, стандартное направление. Контракт SVG — в [docs/SIMULATOR.md](docs/SIMULATOR.md).
