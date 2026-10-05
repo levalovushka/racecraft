@@ -24,21 +24,22 @@ export function TrackView({ race }: { race: Race }) {
         <text x={16} y={-14} className="fill-muted-foreground text-[32px]">решение</text>
       </g>
 
-      {/* box with the light and the two karts */}
+      {/* box: parked karts are squares, karts on track are circles */}
       <g transform={`translate(${bx} ${by})`}>
-        <rect x={-46} y={-70} width={92} height={46} rx={10} className="fill-background stroke-border" strokeWidth={2} />
+        <line x1={0} y1={0} x2={0} y2={48} className="stroke-border" strokeWidth={3} strokeDasharray="6 6" />
+        <rect x={-92} y={48} width={184} height={64} rx={12} className="fill-background stroke-border" strokeWidth={3} />
+        <circle cx={-62} cy={80} r={14} fill={red ? '#ef4444' : '#22c55e'} />
         {race.box.map((k, i) => {
           const c = ourClass(race, k)
           return (
-            <g key={i} transform={`translate(${i === 0 ? -22 : 22} -47)`}>
-              <circle r={19} fill={CLASS_COLOR[c]} opacity={i === 0 ? 1 : 0.55} />
-              <text textAnchor="middle" dy={7} className="fill-white text-[22px] font-semibold">{race.karts[k].label}</text>
+            <g key={i} transform={`translate(${i === 0 ? -6 : 54} 80)`} opacity={i === 0 ? 1 : 0.55}>
+              <rect x={-24} y={-22} width={48} height={44} rx={7} fill={CLASS_COLOR[c]} />
+              <text textAnchor="middle" dy={9} className="fill-white text-[26px] font-bold">{race.karts[k].label}</text>
             </g>
           )
         })}
-        <circle cx={-72} cy={-47} r={15} fill={red ? '#ef4444' : '#22c55e'} />
-        <text x={0} y={-82} textAnchor="middle" className="fill-muted-foreground text-[26px]">
-          бокс · {CLASS[ourClass(race, race.box[0])]}/{CLASS[ourClass(race, race.box[1])]}
+        <text x={0} y={146} textAnchor="middle" className="fill-muted-foreground text-[26px]">
+          бокс · первый {CLASS[ourClass(race, race.box[0])]} · второй {CLASS[ourClass(race, race.box[1])]}
         </text>
       </g>
 
@@ -49,7 +50,7 @@ export function TrackView({ race }: { race: Race }) {
           <g key={d.id} transform={`translate(${x} ${y})`}>
             {d.isUs && <circle r={36} className="fill-none stroke-primary" strokeWidth={6} />}
             <circle r={d.isUs ? 28 : 24} fill={CLASS_COLOR[c]} className="stroke-background" strokeWidth={4} />
-            <text textAnchor="middle" dy={9} className="fill-white text-[26px] font-bold">{d.num}</text>
+            <text textAnchor="middle" dy={9} className="fill-white text-[26px] font-bold">{race.karts[d.kart].label}</text>
           </g>
         )
       })}

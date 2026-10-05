@@ -107,7 +107,7 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
           <Table className="text-sm">
             <TableHeader>
               <TableRow>
-                <TableHead>P</TableHead><TableHead>#</TableHead><TableHead>Пилот</TableHead>
+                <TableHead>P</TableHead><TableHead>Пилот</TableHead>
                 <TableHead className="text-right">Круги</TableHead><TableHead className="text-right">Время</TableHead>
                 <TableHead className="text-right">Штраф</TableHead><TableHead>Карты</TableHead>
               </TableRow>
@@ -116,7 +116,6 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
               {results(race).map((x) => (
                 <TableRow key={x.driver.id} className={cn(x.driver.isUs && 'bg-primary/10 font-semibold')}>
                   <TableCell>{x.dsq ? 'DSQ' : x.pos}</TableCell>
-                  <TableCell>{x.driver.num}</TableCell>
                   <TableCell>{x.driver.name}</TableCell>
                   <TableCell className="text-right tabular-nums">{x.laps}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums">{fmtTime(x.time)}</TableCell>

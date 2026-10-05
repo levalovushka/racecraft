@@ -109,7 +109,7 @@ function UsPanel({ race }: { race: Race }) {
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>{me.name} · #{me.num}</CardTitle>
+        <CardTitle>{me.name}</CardTitle>
         <CardAction>
           <KartBadge label={race.karts[me.kart].label} cls={ourClass(race, me.kart)} />
         </CardAction>
@@ -173,8 +173,10 @@ function BoxPanel({ race }: { race: Race }) {
           )}
           {cont.map((c, i) => (
             <div key={c.d.id} className={cn('flex items-center justify-between gap-2', c.d.isUs && 'font-semibold text-primary')}>
-              <span className="truncate">
-                {i === 0 ? 'Претендент' : i === 1 ? 'Запасной' : 'Третий'} · #{c.d.num} {c.d.name}
+              <span className="flex min-w-0 items-center gap-1.5 truncate">
+                {i === 0 ? 'Претендент' : i === 1 ? 'Запасной' : 'Третий'}
+                <KartBadge label={race.karts[c.d.kart].label} cls={ourClass(race, c.d.kart)} />
+                {c.d.name}
                 <span className="ml-1 text-xs text-muted-foreground">{c.d.commit ? 'едет' : c.hard ? 'твёрдый' : 'мягкий'}</span>
               </span>
               <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">въезд через {c.tEntry.toFixed(1)} с</span>
@@ -191,9 +193,9 @@ function BoxPanel({ race }: { race: Race }) {
               {rejoin.queue > 0 && `очередь ${rejoin.queue} · `}
               {rejoin.wait > 0.5 ? <span className="text-rose-500">ждать {rejoin.wait.toFixed(0)} с</span> : 'без ожидания'}
               {' · выезд '}
-              {rejoin.ahead ? `за #${rejoin.ahead.d.num} ${rejoin.ahead.gap.toFixed(1)} с` : ''}
+              {rejoin.ahead ? `за ${race.karts[rejoin.ahead.d.kart].label} (${rejoin.ahead.d.name}) ${rejoin.ahead.gap.toFixed(1)} с` : ''}
               {rejoin.ahead && rejoin.behind ? ', ' : ''}
-              {rejoin.behind ? `перед #${rejoin.behind.d.num} ${(-rejoin.behind.gap).toFixed(1)} с` : ''}
+              {rejoin.behind ? `перед ${race.karts[rejoin.behind.d.kart].label} (${rejoin.behind.d.name}) ${(-rejoin.behind.gap).toFixed(1)} с` : ''}
             </div>
           </div>
         )}
@@ -295,12 +297,11 @@ function TimingTable({ race }: { race: Race }) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-8">P</TableHead>
-            <TableHead className="w-10">#</TableHead>
+            <TableHead className="w-16">Карт</TableHead>
             <TableHead>Пилот</TableHead>
             <TableHead className="text-right">Круги</TableHead>
             <TableHead className="text-right">Отрыв</TableHead>
             <TableHead className="text-right">Последний</TableHead>
-            <TableHead>Карт</TableHead>
             <TableHead className="text-right">На карте</TableHead>
             <TableHead className="text-right">Питы</TableHead>
             <TableHead>Статус</TableHead>
@@ -313,12 +314,11 @@ function TimingTable({ race }: { race: Race }) {
             return (
               <TableRow key={d.id} className={cn(d.isUs && 'bg-primary/10 font-semibold')}>
                 <TableCell>{i + 1}</TableCell>
-                <TableCell className="tabular-nums">{d.num}</TableCell>
+                <TableCell><KartBadge label={race.karts[d.kart].label} cls={ourClass(race, d.kart)} /></TableCell>
                 <TableCell>{d.name}</TableCell>
                 <TableCell className="text-right tabular-nums">{d.lapsDone}</TableCell>
                 <TableCell className="text-right font-mono tabular-nums">{gapToLeader(d, leader)}</TableCell>
                 <TableCell className="text-right font-mono tabular-nums">{d.lapTimes.at(-1)?.toFixed(2) ?? '—'}</TableCell>
-                <TableCell><KartBadge label={race.karts[d.kart].label} cls={ourClass(race, d.kart)} /></TableCell>
                 <TableCell className="text-right tabular-nums">{Math.max(0, d.lapsDone - cur.start)}</TableCell>
                 <TableCell className="text-right tabular-nums">{d.pitsDone}</TableCell>
                 <TableCell className={TONE[st.tone]}>{st.label}</TableCell>
@@ -356,7 +356,7 @@ function KartsPanel({ race, onChange }: { race: Race; onChange: () => void }) {
     if (race.box[0] === k) return 'бокс 1'
     if (race.box[1] === k) return 'бокс 2'
     const d = race.drivers.find((x) => x.kart === k)
-    return d ? (d.isUs ? 'мы' : `#${d.num}`) : ''
+    return d ? d.name : ''
   }
   const karts = race.karts.slice().sort((a, b) => a.label - b.label)
   return (

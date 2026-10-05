@@ -26,7 +26,8 @@ export const SHAPE = {
     const m = 90
     const x0 = Math.min(...xs) - m
     const y0 = Math.min(...ys) - m
-    return `${x0} ${y0} ${Math.max(...xs) - x0 + m} ${Math.max(...ys) - y0 + m}`
+    const boxBottom = pitXY(TRACK, TRACK.pit.boxAt)[1] + 170 // room for the box drawn under the pit lane
+    return `${x0} ${y0} ${Math.max(...xs) - x0 + m} ${Math.max(Math.max(...ys) + m, boxBottom) - y0}`
   })(),
   zones: TRACK.zones.map(([a, b]) => {
     const s0 = sOfTau(TRACK, a)

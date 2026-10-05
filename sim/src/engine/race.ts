@@ -466,7 +466,7 @@ function crossLine(r: Race, d: Driver, u1: number) {
   }
   if (n >= r.settings.laps) {
     r.flag = true
-    log(r, `Клетчатый флаг: #${d.num} ${d.name}`)
+    log(r, `Клетчатый флаг: ${d.name}`)
     finish(r, d, tCross)
     return
   }
@@ -491,7 +491,7 @@ function enterLane(r: Race, d: Driver, u: number) {
   d.pitLapStint = r.track.pitLapToNew ? d.lapsDone : d.lapsDone + 1
   if (d.isUs) {
     r.intent = 'stay'
-    log(r, `#${d.num} ${d.name}: въехали в пит-лейн`, true)
+    log(r, `${d.name}: въехали в пит-лейн`, true)
   }
 }
 
@@ -539,7 +539,7 @@ function laneStep(r: Race) {
       from, to, wait, boxAfter: [r.box[0], r.box[1]],
     })
     const k = (id: number) => r.karts[id].label
-    log(r, `#${d.num} ${d.name}: ${k(from)} → ${k(to)}${wait > 0.5 ? `, ждал ${wait.toFixed(1)} с` : ''}`, d.isUs)
+    log(r, `${d.name}: карт ${k(from)} → ${k(to)}${wait > 0.5 ? `, ждал ${wait.toFixed(1)} с` : ''}`, d.isUs)
   }
 }
 
