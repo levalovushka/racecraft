@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
-import { Pause, Play, Flag, Radio } from 'lucide-react'
+import { Pause, Play, Flag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { order, raceLap, type Race, type Settings } from '@/engine/race'
+import { order, raceLap, type Order, type Race, type Settings } from '@/engine/race'
 import { stintInfo, timeToDecision, timeToPitIn } from '@/engine/ai'
 import { useSim } from '@/sim/useSim'
 import {
@@ -23,8 +23,9 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
       const k = e.key.toLowerCase()
-      if (k === 'b' || k === 'и') command(true)
-      else if (k === 's' || k === 'ы' || k === 'o' || k === 'щ') command(false)
+      if (k === 'b' || k === 'и') command('box')
+      else if (k === 'c' || k === 'с') command('boxIfClear')
+      else if (k === 's' || k === 'ы') command('stay')
       else if (k === ' ') {
         e.preventDefault()
         setPaused((p) => !p)
@@ -73,9 +74,10 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
           </Card>
           <TimingTable race={race} />
         </div>
-        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto pr-1">
+        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto pr-1 [&>*]:shrink-0">
           <UsPanel race={race} />
-          <DecisionPanel race={race} command={command} />
+          <OrderPanel race={race} command={command} />
+          <BoxPanel race={race} />
           <KartsPanel race={race} onChange={sim.refresh} />
           <LogPanel race={race} />
         </div>
@@ -107,7 +109,7 @@ function UsPanel({ race }: { race: Race }) {
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>Мы · #{me.num}</CardTitle>
+        <CardTitle>{me.name} · #{me.num}</CardTitle>
         <CardAction>
           <KartBadge label={race.karts[me.kart].label} cls={ourClass(race, me.kart)} />
         </CardAction>
@@ -131,29 +133,24 @@ function UsPanel({ race }: { race: Race }) {
   )
 }
 
-function DecisionPanel({ race, command }: { race: Race; command: (box: boolean) => void }) {
+const ORDERS: { value: Order; label: string; key: string; hint: string }[] = [
+  { value: 'stay', label: 'Мимо', key: 'S', hint: 'Пилот проезжает въезд в пит-лейн.' },
+  { value: 'boxIfClear', label: 'Бокс, если чисто', key: 'C', hint: 'Пилот заедет, если перед ним никто не въедет в пит-лейн. Решает сам у въезда — позже общей точки решения.' },
+  { value: 'box', label: 'Бокс', key: 'B', hint: 'Пилот заедет на ближайшем въезде, что бы ни было.' },
+]
+const ORDER_LABEL: Record<Order, string> = { stay: 'мимо', box: 'бокс', boxIfClear: 'бокс, если чисто' }
+
+function BoxPanel({ race }: { race: Race }) {
   const me = us(race)
   const red = race.t < race.greenAt
   const cont = contenders(race)
   const rejoin = projectRejoin(race)
-  const tDec = timeToDecision(race, me)
-  const tIn = timeToPitIn(race, me)
   const done = me.pitsDone >= race.settings.pits || race.flag
-  const committed = me.commit
-  const inLane = me.mode !== 'track' && me.mode !== 'done'
-  const passedDecision = me.mode === 'track' && tIn < tDec
-
-  let status: string
-  if (done) status = 'Все питы сделаны'
-  else if (inLane) status = 'Пит-лейн'
-  else if (committed) status = `Бокс на этом круге · въезд через ${tIn.toFixed(1)} с`
-  else if (race.intent) status = passedDecision ? `«Бокс» на следующем круге · решение через ${tDec.toFixed(1)} с` : `«Бокс» · точка решения через ${tDec.toFixed(1)} с`
-  else status = `Остаёмся · точка решения через ${tDec.toFixed(1)} с`
-
+  const anyEligible = race.drivers.some((d) => d.mode === 'track' && d.pitsDone < race.settings.pits && stintInfo(race, d).eligible)
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>Решение</CardTitle>
+        <CardTitle>Бокс</CardTitle>
         <CardAction>
           <span className={cn('rounded-md px-2 py-0.5 font-mono text-xs font-semibold tabular-nums', red ? 'bg-rose-500/15 text-rose-500' : 'bg-emerald-500/15 text-emerald-500')}>
             {red ? `КРАСНЫЙ ${(race.greenAt - race.t).toFixed(0)} с` : 'ЗЕЛЁНЫЙ'}
@@ -162,37 +159,32 @@ function DecisionPanel({ race, command }: { race: Race; command: (box: boolean) 
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Бокс</span>
+          <span className="text-muted-foreground">Первый</span>
           <KartBadge label={race.karts[race.box[0]].label} cls={ourClass(race, race.box[0])} />
+          <span className="ml-2 text-muted-foreground">второй</span>
           <KartBadge label={race.karts[race.box[1]].label} cls={ourClass(race, race.box[1])} dim />
         </div>
-
         <div className="space-y-1 text-sm">
           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Кто заберёт {race.karts[race.box[0]].label} [{CLASS[ourClass(race, race.box[0])]}]
           </div>
           {cont.length === 0 && (
-            <div className="text-muted-foreground">
-              {race.drivers.some((d) => d.mode === 'track' && d.pitsDone < race.settings.pits && stintInfo(race, d).eligible)
-                ? 'Никому не нужен — бокс мёртвый'
-                : 'Пока никто не может: минимальный стинт'}
-            </div>
+            <div className="text-muted-foreground">{anyEligible ? 'Никому не нужен — бокс мёртвый' : 'Пока никто не может: минимальный стинт'}</div>
           )}
           {cont.map((c, i) => (
-            <div key={c.d.id} className={cn('flex items-center justify-between', c.d.isUs && 'font-semibold text-primary')}>
-              <span>
-                {i === 0 ? 'Претендент' : i === 1 ? 'Запасной' : 'Третий'} · #{c.d.num} {c.d.isUs ? 'МЫ' : c.d.name}
+            <div key={c.d.id} className={cn('flex items-center justify-between gap-2', c.d.isUs && 'font-semibold text-primary')}>
+              <span className="truncate">
+                {i === 0 ? 'Претендент' : i === 1 ? 'Запасной' : 'Третий'} · #{c.d.num} {c.d.name}
                 <span className="ml-1 text-xs text-muted-foreground">{c.d.commit ? 'едет' : c.hard ? 'твёрдый' : 'мягкий'}</span>
               </span>
-              <span className="font-mono text-xs tabular-nums text-muted-foreground">у въезда через {c.tEntry.toFixed(1)} с</span>
+              <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">въезд через {c.tEntry.toFixed(1)} с</span>
             </div>
           ))}
         </div>
-
         {rejoin && !done && (
           <div className="rounded-lg bg-muted/50 p-2 text-sm">
             <div className="flex items-center justify-between">
-              <span>Если бокс сейчас</span>
+              <span>Если мы заедем на ближайшем въезде</span>
               <KartBadge label={race.karts[rejoin.kart].label} cls={ourClass(race, rejoin.kart)} />
             </div>
             <div className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
@@ -205,16 +197,82 @@ function DecisionPanel({ race, command }: { race: Race; command: (box: boolean) 
             </div>
           </div>
         )}
+      </CardContent>
+    </Card>
+  )
+}
 
-        <div className="text-sm">{status}</div>
-        <div className="grid grid-cols-2 gap-2">
-          <Button size="lg" disabled={done || inLane} variant={race.intent ? 'default' : 'outline'} onClick={() => command(true)} className="h-12">
-            <Radio /> Бокс, бокс <kbd className="ml-1 text-[10px] opacity-60">B</kbd>
-          </Button>
-          <Button size="lg" disabled={done || inLane} variant={!race.intent ? 'secondary' : 'outline'} onClick={() => command(false)} className="h-12">
-            Остаёмся <kbd className="ml-1 text-[10px] opacity-60">S</kbd>
-          </Button>
+function OrderPanel({ race, command }: { race: Race; command: (o: Order) => void }) {
+  const me = us(race)
+  const tDec = timeToDecision(race, me)
+  const tIn = timeToPitIn(race, me)
+  const done = me.pitsDone >= race.settings.pits || race.flag
+  const inLane = me.mode !== 'track' && me.mode !== 'done'
+  // between the decision point and the entry the order for this lap is already with the pilot
+  const handed = me.mode === 'track' && tIn < tDec
+  const handedOrder: Order = me.commit ? (me.conditional ? 'boxIfClear' : 'box') : 'stay'
+  const lapT = me.lapT || 30
+  const toDecision = handed ? 0 : Math.max(0, Math.min(1, 1 - tDec / lapT))
+
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>Указание пилоту</CardTitle>
+        <CardAction className="text-xs text-muted-foreground">действует до отмены</CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
+          {ORDERS.map((o) => (
+            <button
+              key={o.value}
+              disabled={done || inLane}
+              onClick={() => command(o.value)}
+              className={cn(
+                'flex h-14 flex-col items-center justify-center rounded-md px-1 text-sm font-medium leading-tight transition-colors disabled:opacity-40',
+                race.intent === o.value
+                  ? o.value === 'stay' ? 'bg-background text-foreground shadow-sm' : 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <span className="text-center">{o.label}</span>
+              <kbd className="text-[10px] opacity-60">{o.key}</kbd>
+            </button>
+          ))}
         </div>
+        <p className="text-xs text-muted-foreground">{ORDERS.find((o) => o.value === race.intent)!.hint}</p>
+        {race.intent !== 'stay' && !done && !inLane && !stintInfo(race, me).eligible && (
+          <p className="text-xs text-rose-500">
+            Минимальный стинт не пройден: заезд сейчас — штраф +10 с за каждый недостающий круг.
+          </p>
+        )}
+
+        {done ? (
+          <div className="text-sm text-muted-foreground">Все обязательные питы сделаны.</div>
+        ) : inLane ? (
+          <div className="text-sm">Пилот в пит-лейне.</div>
+        ) : handed ? (
+          <div className="rounded-lg border border-primary/40 p-2 text-sm">
+            <div>
+              Пилот уже получил: <b>{ORDER_LABEL[handedOrder]}</b> · въезд через {tIn.toFixed(1)} с
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {race.intent !== handedOrder ? `«${ORDER_LABEL[race.intent]}» уйдёт на следующем круге.` : 'Изменить на этом круге уже нельзя.'}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span>
+                Пилот получит «{ORDER_LABEL[race.intent]}»
+              </span>
+              <span className="font-mono tabular-nums">через {tDec.toFixed(1)} с</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-[width] duration-75" style={{ width: `${toDecision * 100}%` }} />
+            </div>
+            <div className="text-xs text-muted-foreground">Точка решения — перед последним поворотом к линии.</div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

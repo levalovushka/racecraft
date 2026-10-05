@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { classOf, results, type Race } from '@/engine/race'
+import { classOf, results, type Order, type Race } from '@/engine/race'
 import {
   interestingDecisions, lossBreakdown, runBot, score, stintViews,
   type DecisionValue, type DecisionView, type StintView,
@@ -36,7 +36,7 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
       <div className="grid grid-cols-3 gap-4">
         <Card>
           <CardHeader>
-            <CardDescription>Мы</CardDescription>
+            <CardDescription>{race.drivers[0].name}</CardDescription>
             <CardTitle className="text-3xl">{ours.dsq ? 'DSQ' : `P${ours.pos}`}</CardTitle>
           </CardHeader>
           <CardContent className="font-mono text-sm tabular-nums text-muted-foreground">
@@ -49,7 +49,7 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
             <CardTitle className="text-3xl">{bot.outcome.dsq ? 'DSQ' : `P${bot.outcome.pos}`}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Едет по правилу входа с вашими классами картов, под красный не встаёт.
+            Тот же старт, правило входа с вашими классами картов, под красный не встаёт.
           </CardContent>
         </Card>
         <Card className={cn(delta >= 0 ? 'ring-emerald-500/40' : 'ring-rose-500/40')}>
@@ -93,7 +93,7 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
         <Card size="sm">
           <CardHeader><CardTitle>Стинты</CardTitle><CardDescription>Истинный класс открыт после гонки</CardDescription></CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
-            <Stints title="Мы" rows={stintViews(race)} />
+            <Stints title={race.drivers[0].name} rows={stintViews(race)} />
             <Stints title="Бот" rows={stintViews(bot.race)} />
           </CardContent>
         </Card>
@@ -209,7 +209,7 @@ function DecisionsCard({ decisions, race }: { decisions: DecisionView[]; race: R
                       <TableCell><KartBadge label={race.karts[v.offered].label} cls={ourCls(v.offered)} /></TableCell>
                       <TableCell className="text-right font-mono tabular-nums">{v.wait > 0.5 ? `${v.wait.toFixed(0)} с` : '—'}</TableCell>
                       <TableCell className="text-right tabular-nums">{v.margin} кр</TableCell>
-                      <TableCell className="font-semibold">{v.dec.commit ? 'Бокс' : 'Остались'}</TableCell>
+                      <TableCell className="font-semibold">{orderText(v.dec.order, v.dec.commit)}</TableCell>
                       {val && val !== 'busy' ? (
                         <>
                           <TableCell className="text-right font-mono tabular-nums">{val.pit.mean.toFixed(1)}</TableCell>
@@ -235,6 +235,12 @@ function DecisionsCard({ decisions, race }: { decisions: DecisionView[]; race: R
       </CardContent>
     </Card>
   )
+}
+
+function orderText(order: Order, commit: boolean) {
+  if (order === 'box') return 'Бокс'
+  if (order === 'stay') return 'Мимо'
+  return commit ? 'Бокс, если чисто → заехали' : 'Бокс, если чисто → перед нами заехали'
 }
 
 function Verdict({ val, commit }: { val: DecisionValue; commit: boolean }) {

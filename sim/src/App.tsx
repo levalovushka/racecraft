@@ -7,11 +7,16 @@ import { Debrief } from '@/components/Debrief'
 type Phase = { kind: 'setup' } | { kind: 'race'; run: number } | { kind: 'debrief'; race: Race }
 
 export default function App() {
-  const [settings, setSettings] = useState<Settings>(() => ({ ...DEFAULT_SETTINGS, seed: Math.floor(Math.random() * 1e6) }))
+  const [settings, setSettings] = useState<Settings>(() => ({
+    ...DEFAULT_SETTINGS,
+    seed: Math.floor(Math.random() * 1e6),
+    ourName: loadName() ?? DEFAULT_SETTINGS.ourName,
+  }))
   const [phase, setPhase] = useState<Phase>({ kind: 'setup' })
   const [run, setRun] = useState(0)
 
   const start = (s: Settings) => {
+    saveName(s.ourName)
     setSettings(s)
     setRun((x) => x + 1)
     setPhase({ kind: 'race', run: run + 1 })
@@ -31,4 +36,21 @@ export default function App() {
       }}
     />
   )
+}
+
+// the name is a per-viewer convenience: storage may be unavailable, the app works without it
+function loadName(): string | null {
+  try {
+    return localStorage.getItem('racecraft.name')
+  } catch {
+    return null
+  }
+}
+
+function saveName(name: string) {
+  try {
+    localStorage.setItem('racecraft.name', name)
+  } catch {
+    // ignore
+  }
 }

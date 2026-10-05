@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createRace, P, step, type Race, type Settings } from '@/engine/race'
+import { createRace, P, step, type Order, type Race, type Settings } from '@/engine/race'
 import { TRACK } from './model'
 
 /** Runs the race in real time (times `speed`) and re-renders on every animation frame.
@@ -37,8 +37,8 @@ export function useSim(settings: Settings) {
     return () => cancelAnimationFrame(raf)
   }, [race, paused, speed])
 
-  const command = useCallback((box: boolean) => {
-    race.intent = box
+  const command = useCallback((order: Order) => {
+    race.intent = order
     setFrame((f) => f + 1)
   }, [race])
 

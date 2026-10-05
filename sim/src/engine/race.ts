@@ -13,6 +13,9 @@ export interface Settings {
   pitLoss: number // s lost by a stop without waiting (pit lap + next lap - two clean laps)
   ourPace: number // s/lap vs field median, negative = faster
   ourAggr: number // 0..1
+  ourName: string
+  gridPos: number | null // start conditions: our grid slot (1..10), null = from qualifying
+  ourKartClass: number | null // start conditions: class of our race kart (0..3 = A..D), null = from the draw
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -21,10 +24,16 @@ export const DEFAULT_SETTINGS: Settings = {
   minStint: 10,
   pits: 2,
   stopTime: 25,
-  pitLoss: 28,
+  pitLoss: 32,
   ourPace: 0,
   ourAggr: 0.5,
+  ourName: 'Мы',
+  gridPos: null,
+  ourKartClass: null,
 }
+
+/** Manager's standing order for the coming pit entry */
+export type Order = 'stay' | 'box' | 'boxIfClear'
 
 export const P = {
   dt: 0.05,
@@ -91,6 +100,7 @@ export interface Driver {
   stints: Stint[]
   pitsDone: number
   commit: boolean
+  conditional: boolean // committed with "box if nobody goes in ahead": the driver checks at the entry
   attacked: boolean
   stuck: boolean
   trafficLoss: number
@@ -119,7 +129,8 @@ export interface PitRecord {
 export interface Decision {
   t: number
   lap: number
-  commit: boolean
+  order: Order
+  commit: boolean // what actually happened: did we go in
   snapshot: Race
 }
 
@@ -143,7 +154,7 @@ export interface Race {
   frontLog: { t: number; kart: number }[]
   log: LogItem[]
   attempts: Set<string>
-  intent: boolean // manager: box on the next decision point
+  intent: Order // manager's standing order, handed over at the decision point
   ourPolicy: 'manager' | 'bot'
   forceNext: boolean | null // rollouts: forced decision at our next decision point
   decisions: Decision[]
@@ -159,6 +170,8 @@ const NAMES = [
   'Абрамов', 'Белов', 'Волков', 'Громов', 'Демин', 'Егоров', 'Жуков', 'Зайцев', 'Ильин', 'Карпов',
   'Лебедев', 'Морозов', 'Новиков', 'Орлов', 'Павлов', 'Романов', 'Соколов', 'Титов', 'Уваров', 'Фомин',
 ]
+
+export const CLASS_CENTER = [-0.22, -0.07, 0.07, 0.22]
 
 export function classOf(effect: number): number {
   if (effect <= -0.15) return 0
@@ -185,6 +198,16 @@ export function createRace(settings: Settings, track: Track): Race {
   const nums = shuffle(Array.from({ length: 20 }, (_, i) => i + 1), seed, K.numbers).slice(0, 10)
   const names = shuffle(NAMES, seed, K.names)
   const draw = shuffle(Array.from({ length: 12 }, (_, i) => i), seed, K.draw)
+  if (settings.ourKartClass !== null) {
+    // start conditions: give us a kart of the wanted class, swapping it with whoever drew it
+    const want = settings.ourKartClass
+    const dist = (k: Kart) => Math.abs(k.effect - CLASS_CENTER[want])
+    const inClass = karts.filter((k) => classOf(k.effect) === want)
+    const pick = (inClass.length ? inClass : karts).reduce((a, b) => (dist(b) < dist(a) ? b : a))
+    if (!inClass.length) pick.effect = CLASS_CENTER[want] // nothing of that class in this draw: re-rate the closest kart
+    const j = draw.indexOf(pick.id)
+    ;[draw[0], draw[j]] = [draw[j], draw[0]]
+  }
 
   const drivers: Driver[] = Array.from({ length: 10 }, (_, i) => {
     const isUs = i === 0
@@ -192,7 +215,7 @@ export function createRace(settings: Settings, track: Track): Race {
     return {
       id: i,
       num: nums[i],
-      name: isUs ? 'Мы' : names[i],
+      name: isUs ? settings.ourName.trim() || 'Мы' : names[i],
       isUs,
       pace: isUs ? settings.ourPace : P.fieldPaceSd * gauss(seed, K.driverPace, i),
       aggr: isUs ? settings.ourAggr : 0.1 + 0.8 * rand(seed, K.driverAggr, i),
@@ -212,6 +235,7 @@ export function createRace(settings: Settings, track: Track): Race {
       stints: [{ kart: draw[i], start: 0, end: null }],
       pitsDone: 0,
       commit: false,
+      conditional: false,
       attacked: false,
       stuck: false,
       trafficLoss: 0,
@@ -232,6 +256,11 @@ export function createRace(settings: Settings, track: Track): Race {
     t: d.pace + karts[Math.floor(rand(seed, K.qual, d.id) * 12)].effect + 0.12 * gauss(seed, K.qual, d.id, 1),
   }))
   qual.sort((a, b) => a.t - b.t)
+  if (settings.gridPos !== null) {
+    const i = qual.findIndex((q) => q.d.isUs)
+    const [me] = qual.splice(i, 1)
+    qual.splice(Math.min(Math.max(settings.gridPos, 1), 10) - 1, 0, me)
+  }
   qual.forEach(({ d }, pos) => {
     d.u = -(pos + 1) * P.gridGap
   })
@@ -252,7 +281,7 @@ export function createRace(settings: Settings, track: Track): Race {
     frontLog: [{ t: 0, kart: draw[10] }],
     log: [],
     attempts: new Set(),
-    intent: false,
+    intent: 'stay',
     ourPolicy: 'manager',
     forceNext: null,
     decisions: [],
@@ -368,7 +397,16 @@ export function step(r: Race, dt = P.dt) {
     if (Math.floor(u0 - tr.tauDecision) < Math.floor(u1 - tr.tauDecision)) decide(r, d)
     if (Math.floor(u0) < Math.floor(u1)) crossLine(r, d, u1)
     if (d.mode === 'track' && d.commit && Math.floor(u0 - tr.tauPitIn) < Math.floor(u1 - tr.tauPitIn)) {
-      enterLane(r, d, Math.floor(u1 - tr.tauPitIn) + tr.tauPitIn)
+      if (d.conditional && r.drivers.some((o) => o.mode === 'laneIn' || o.mode === 'wait')) {
+        // "box if nobody goes in ahead": somebody did, the driver stays out
+        d.commit = false
+        d.conditional = false
+        const last = r.decisions.at(-1)
+        if (last && last.lap === d.lapsDone) last.commit = false
+        if (d.isUs) log(r, 'Перед нами заехали — пилот остался на трассе', true)
+      } else {
+        enterLane(r, d, Math.floor(u1 - tr.tauPitIn) + tr.tauPitIn)
+      }
     }
   }
 
@@ -392,6 +430,7 @@ function passProb(r: Race, d: Driver, ahead: Driver, delta: number): number {
 }
 
 function decide(r: Race, d: Driver) {
+  d.conditional = false
   if (r.flag || d.pitsDone >= r.settings.pits) {
     d.commit = false
     return
@@ -402,10 +441,13 @@ function decide(r: Race, d: Driver) {
     return
   }
   if (d.isUs && r.ourPolicy === 'manager') {
+    const order = r.intent
     if (r.recordDecisions) {
-      r.decisions.push({ t: r.t, lap: d.lapsDone + 1, commit: r.intent, snapshot: cloneRace(r) })
+      // lap = laps completed when the pit lane entry comes (it lies just after the line)
+      r.decisions.push({ t: r.t, lap: d.lapsDone + 1, order, commit: order !== 'stay', snapshot: cloneRace(r) })
     }
-    d.commit = r.intent
+    d.commit = order !== 'stay'
+    d.conditional = order === 'boxIfClear'
     return
   }
   d.commit = aiWantsPit(r, d)
@@ -441,14 +483,15 @@ function enterLane(r: Race, d: Driver, u: number) {
   d.u = u
   d.mode = 'laneIn'
   d.commit = false
+  d.conditional = false
   d.laneT0 = r.t
   d.laneT1 = r.t + P.toBox
   d.laneFrom = 0
   d.laneTo = r.track.pit.boxAt
   d.pitLapStint = r.track.pitLapToNew ? d.lapsDone : d.lapsDone + 1
   if (d.isUs) {
-    r.intent = false
-    log(r, 'Мы въехали в пит-лейн', true)
+    r.intent = 'stay'
+    log(r, `#${d.num} ${d.name}: въехали в пит-лейн`, true)
   }
 }
 
