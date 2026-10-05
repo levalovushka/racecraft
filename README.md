@@ -27,5 +27,8 @@ python3 scripts/build_track.py tracks/premium.svg tracks/premium-std.json  # к�
 ```
 Зависимости: `pip install -r requirements.txt`.
 
+## Симулятор
+`sim/` — веб-тренажёр менеджера (Vite + React + shadcn/ui): полная гонка в реальном времени, команды пилоту, разбор против бота. Запуск: `cd sim && npm install && npm run dev`. Подробно — [sim/README.md](sim/README.md), спецификация — [docs/SIMULATOR.md](docs/SIMULATOR.md).
+
 ## Трассы
 `tracks/premium.svg` — текущая конфигурация Премиума (траектория, пит-лейн, линия отсечки, зоны обгона), `tracks/premium-std.json` — собранный конфиг для симулятора, стандартное направление. Контракт SVG — в [docs/SIMULATOR.md](docs/SIMULATOR.md).
