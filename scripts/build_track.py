@@ -10,10 +10,11 @@ SVG contract (see docs/SIMULATOR.md):
   track              filled ribbon, used to cut off the part of the pit lane drawn under it
 
 Output: polyline in race direction starting at the timing line, speed profile,
-markers as lap fractions s in [0,1), pit lane centerline and its calibrated speed.
+markers as lap fractions s in [0,1), pit lane centerline.
 Absolute scale is unknown, so it is solved so that the lap takes LAP_TIME.
-Pit lane timing comes from data (PIT_LOSS); the script warns if the drawn
-pit lane cannot be driven that fast.
+Pit loss is reported twice: from data (PIT_LOSS, used by the engine) and from
+a physical estimate on this geometry (braking to the box, standing, accelerating
+away, compared with staying on track).
 """
 import json, sys
 import numpy as np
@@ -22,7 +23,9 @@ from svgpathtools import svg2paths, Line
 # race / calibration targets (Premium, ГГ 2025-26 data, see docs/MECHANICS.md)
 LAP_TIME = 30.0      # s, typical clean lap
 PIT_LOSS = 28.0      # s, pit lap + next lap minus two clean laps, no waiting under red
-STOP_TIME = 25.0     # s, minimal stop (button -> green), reg. 10.9
+STOP_TIME = 25.0     # s, minimal stop, counted from the button press at the box, reg. 10.9
+REACTION = 0.4       # s, from green / manager's go to moving
+PIT_OUT_MAX_S = 0.18 # driver rejoins before the first corner (the drawn lane runs into it)
 DIRECTION = -1       # standard direction runs against the drawn racing line
 DECISION_S = 0.97    # last point to commit to pit entry, lap fraction from the line
 BOX_AT = 0.10        # box/light position along the pit lane (traffic light right after entry)
@@ -55,7 +58,7 @@ def radius(pts, k=6):
     a, b, c = np.roll(pts, k, 0), pts, np.roll(pts, -k, 0)
     ab, bc, ca = (np.hypot(*(b - a).T), np.hypot(*(c - b).T), np.hypot(*(a - c).T))
     cross = np.abs((b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (b[:, 1] - a[:, 1]) * (c[:, 0] - a[:, 0]))
-    with np.errstate(divide='ignore'):
+    with np.errstate(divide='ignore', invalid='ignore'):
         return np.where(cross > 1e-9, ab * bc * ca / (2 * cross), np.inf)
 
 
@@ -123,6 +126,34 @@ def pit_centerline(path):
     return mid, [(z.real, z.imag) for z in end_mid]
 
 
+def run_speed(cap, d):
+    """Time along an open path with speed caps, limited by acceleration and braking."""
+    v = cap.copy()
+    for i in range(1, len(v)):
+        v[i] = min(v[i], np.sqrt(v[i - 1] ** 2 + 2 * A_ACC * d[i - 1]))
+    for i in range(len(v) - 2, -1, -1):
+        v[i] = min(v[i], np.sqrt(v[i + 1] ** 2 + 2 * A_BRK * d[i]))
+    return np.sum(d / np.maximum((v[:-1] + v[1:]) / 2, 0.05))
+
+
+def physical_pit_loss(pts, v, scale, ds_px, lane, i_in, i_out, window=60):
+    """Pit path (track -> lane with a stop at the box -> track) minus the same span on track."""
+    n = len(pts)
+    before = pts[np.arange(i_in - window, i_in + 1) % n]
+    after = pts[np.arange(i_out, i_out + window + 1) % n]
+    path = np.vstack([before, lane, after])
+    d = np.hypot(*np.diff(path, axis=0).T) * scale
+    r_lane = np.minimum(radius(np.vstack([lane[:1]] * 3 + [lane] + [lane[-1:]] * 3), 3)[3:-3], 1e9)
+    cap = np.r_[v[np.arange(i_in - window, i_in + 1) % n],
+                np.minimum(V_MAX, np.sqrt(A_LAT * r_lane * scale)),
+                v[np.arange(i_out, i_out + window + 1) % n]]
+    cap[len(before) + int(BOX_AT * len(lane))] = 0.0
+    t_pit = run_speed(cap, d) + STOP_TIME + REACTION
+    idx = np.arange(i_in - window, i_out + window + 1) % n
+    t_track = run_speed(v[idx].copy(), np.full(len(idx) - 1, ds_px * scale))
+    return float(t_pit - t_track)
+
+
 def main(svg, out):
     paths, attrs = svg2paths(svg)
     P = {a.get('id'): p for p, a in zip(paths, attrs)}
@@ -161,6 +192,10 @@ def main(svg, out):
     ribbon = [path_points(sp, 200) for sp in P['track'].continuous_subpaths()]
     off = [i for i, (x, y) in enumerate(pit_mid) if not inside(ribbon, x, y)]
     pit_mid = pit_mid[off[0]:off[-1] + 1]
+    if nearest_s(pts, *pit_mid[0])[0] > nearest_s(pts, *pit_mid[-1])[0]:
+        pit_mid = pit_mid[::-1]
+    k_out = next(k for k, (x, y) in enumerate(pit_mid) if nearest_s(pts, x, y)[0] >= PIT_OUT_MAX_S)
+    pit_mid = pit_mid[:k_out + 1]
     s_in = nearest_s(pts, *pit_mid[0])[0]
     s_out = nearest_s(pts, *pit_mid[-1])[0]
     pit_len_px = np.hypot(*np.diff(pit_mid, axis=0).T).sum()
@@ -168,24 +203,9 @@ def main(svg, out):
     # time on track between pit entry and exit
     i_in, i_out = int(s_in * N), int(s_out * N)
     t_bypass = dt[i_in:i_out].sum()
-    v_in, v_out = v[i_in], v[i_out]
-    # Data-calibrated pit timeline: from pit entry to pit exit the kart spends
-    # PIT_LOSS + t_bypass seconds when it does not wait under red; STOP_TIME of it
-    # standing at the box. The remaining drive time is split by distance.
     L = pit_len_px * scale
-    lane_time = PIT_LOSS + t_bypass
-    drive = lane_time - STOP_TIME
-    # physical lower bound on that drive: brake from track speed, stop at the box, accelerate away
-    def min_drive(vp):
-        d_in, d_out = BOX_AT * L, (1 - BOX_AT) * L
-        def leg(d, v0, v1):  # v0 -> vp -> v1 over distance d, trapezoid
-            d_acc = max(vp ** 2 - v0 ** 2, 0) / (2 * A_ACC) if v0 < vp else (v0 ** 2 - vp ** 2) / (2 * A_BRK)
-            d_dec = (vp ** 2 - v1 ** 2) / (2 * A_BRK) if vp > v1 else (v1 ** 2 - vp ** 2) / (2 * A_ACC)
-            t_acc = abs(vp - v0) / (A_ACC if v0 < vp else A_BRK)
-            t_dec = abs(vp - v1) / (A_BRK if vp > v1 else A_ACC)
-            return t_acc + t_dec + max(d - d_acc - d_dec, 0) / vp
-        return leg(d_in, v_in, 0.01) + leg(d_out, 0.01, v_out)
-    phys = min(min_drive(vp) for vp in np.linspace(3, V_MAX, 60))
+    lane_time = PIT_LOSS + t_bypass  # entry to exit when not waiting under red (data)
+    loss_phys = physical_pit_loss(pts, v, scale, ds_px, pit_mid, i_in, i_out)
     zones = sorted(zone_range(pts, p) for k, p in P.items() if k and k.startswith('overtake zone'))
 
     cfg = {
@@ -216,20 +236,17 @@ def main(svg, out):
             'lengthM': round(L, 1),
             'boxAt': BOX_AT,
             'laneTime': round(float(lane_time), 2),
-            'driveTime': round(float(drive), 2),
-            'driveTimePhysMin': round(float(phys), 2),
             'trackBypassTime': round(float(t_bypass), 2),
+            'pitLossData': PIT_LOSS,
+            'pitLossPhys': round(loss_phys, 2),
         },
     }
     json.dump(cfg, open(out, 'w'), ensure_ascii=False)
     print(f'scale {scale:.4f} m/px, lap length {cfg["lengthM"]} m, lap {t:.2f} s')
     print(f'speed min {v.min()*3.6:.0f} km/h, max {v.max()*3.6:.0f} km/h, mean {cfg["lengthM"]/t*3.6:.0f} km/h')
     print(f'pit in {s_in:.3f}, out {s_out:.3f}; lane {L:.0f} m, bypassed track {t_bypass:.2f} s')
-    print(f'lane time {lane_time:.2f} s = stop {STOP_TIME} + drive {drive:.2f} s '
-          f'(physical minimum for this geometry {phys:.2f} s)')
-    if drive < phys:
-        print(f'WARNING: pit loss {PIT_LOSS} s is not reachable on this geometry; '
-              f'minimum is {phys - drive + PIT_LOSS:.1f} s. Check pit lane drawing or stop procedure.')
+    print(f'pit loss: data {PIT_LOSS} s (used), physical estimate {loss_phys:.1f} s '
+          f'(stop {STOP_TIME} + reaction {REACTION} + braking/acceleration and lane vs track)')
     print('pass zones', zones)
 
 
