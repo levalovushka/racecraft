@@ -1,10 +1,10 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeftRight, Flag, Pause, Play, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { raceLap, type LogItem, type Order, type Race, type Settings } from '@/engine/race'
 import { stintInfo, timeToDecision, timeToPitIn } from '@/engine/ai'
 import { useSim } from '@/sim/useSim'
-import { ourClass, projectRejoin, publicStatus, setOurClass, timingOrder, TRACK, us } from '@/sim/model'
+import { ourClass, projectRejoin, publicStatus, setOurClass, timingOrder, us } from '@/sim/model'
 import { TrackView } from './TrackView'
 import { KartChip, TimingTable } from './TimingTable'
 
@@ -46,7 +46,8 @@ export function RaceScreen({ settings, onFinish, onRestart, onExit }: {
   const lap = Math.min(raceLap(race), race.settings.laps)
 
   return (
-    <div className="flex h-screen gap-4 bg-black p-3 text-[12px] text-white">
+    <Stage>
+    <div className="flex h-[800px] w-[1440px] gap-4 bg-black p-3 text-[12px] text-white">
       {/* left column */}
       <div className="flex w-[588px] shrink-0 flex-col">
         <div className="flex h-9 items-center">
@@ -100,12 +101,37 @@ export function RaceScreen({ settings, onFinish, onRestart, onExit }: {
       <div className="flex min-w-0 flex-1 flex-col gap-5">
         <TimingTable race={race} onKart={cycleClass} />
         <div className="grid min-h-0 flex-1 grid-cols-2 gap-5">
-          <RelativeTable race={race} onKart={cycleClass} />
           <PilotPanel race={race} />
+          <StatusTable race={race} />
         </div>
       </div>
     </div>
+    </Stage>
   )
+}
+
+const W = 1440
+const H = 800
+
+/** The race screen is laid out at the design size (1440×800) and scaled to fit the window */
+function Stage({ children }: { children: React.ReactNode }) {
+  const [scale, setScale] = useState(() => fit())
+  useEffect(() => {
+    const onResize = () => setScale(fit())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return (
+    <div className="flex h-screen w-screen items-center justify-center overflow-hidden bg-black">
+      <div style={{ width: W * scale, height: H * scale }}>
+        <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: '0 0' }}>{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function fit() {
+  return Math.min(window.innerWidth / W, window.innerHeight / H)
 }
 
 // ---------------------------------------------------------------- events
@@ -186,22 +212,22 @@ function OrderTiles({ race, command }: { race: Race; command: (o: Order) => void
             onClick={() => command(o.value)}
             className={cn(
               'flex flex-col items-start justify-between rounded-[4px] px-4 py-3 text-left transition-colors disabled:cursor-not-allowed',
-              live ? 'bg-white text-black' : selected ? 'bg-white/25' : 'bg-white/10 hover:bg-white/15',
+              live ? 'bg-white/[0.22] ring-1 ring-white/60 ring-inset' : selected ? 'bg-white/[0.16] ring-1 ring-white/25 ring-inset' : 'bg-white/10 hover:bg-white/[0.14]',
               (done || inLane) && 'opacity-50',
             )}
           >
             <span className="flex w-full items-baseline justify-between text-[14px]">
               {o.label}
-              <kbd className={cn('text-[10px]', live ? 'text-black/40' : 'text-white/30')}>{o.key}</kbd>
+              <kbd className="text-[10px] text-white/30">{o.key}</kbd>
             </span>
             <span className="flex w-full flex-col gap-1 text-[12px]">
               {o.value === 'box' && rejoin && !done && !inLane && (
-                <BoxForecast race={race} rejoin={rejoin} dark={live} />
+                <BoxForecast race={race} rejoin={rejoin} />
               )}
               {o.value !== 'stay' && early && !done && !inLane && (
-                <span className={live ? 'text-[#b4282d]' : 'text-[#e5484d]'}>Мин. стинт не пройден: +10 с за круг</span>
+                <span className="text-[#e5484d]/80">Мин. стинт не пройден</span>
               )}
-              {note && <span className={live ? 'text-black/60' : 'text-white/50'}>{note}</span>}
+              {note && <span className="text-white/50">{note}</span>}
             </span>
           </button>
         )
@@ -211,8 +237,8 @@ function OrderTiles({ race, command }: { race: Race; command: (o: Order) => void
 }
 
 /** Interim box forecast in the Box tile: kart we get, wait, where we rejoin */
-function BoxForecast({ race, rejoin, dark }: { race: Race; rejoin: NonNullable<ReturnType<typeof projectRejoin>>; dark: boolean }) {
-  const muted = dark ? 'text-black/60' : 'text-white/50'
+function BoxForecast({ race, rejoin }: { race: Race; rejoin: NonNullable<ReturnType<typeof projectRejoin>> }) {
+  const muted = 'text-white/50'
   return (
     <span className="flex flex-col gap-1">
       <span className="flex items-center gap-1.5">
@@ -230,47 +256,36 @@ function BoxForecast({ race, rejoin, dark }: { race: Race; rejoin: NonNullable<R
 
 // ---------------------------------------------------------------- relative
 
-/** Drivers by road position around us: ahead on top, behind below */
-function RelativeTable({ race, onKart }: { race: Race; onKart: (kart: number) => void }) {
+/** Pit-related state of every driver, in timing order */
+function StatusTable({ race }: { race: Race }) {
   const me = us(race)
-  const lap = TRACK.refLap
-  const rows = race.drivers
-    .filter((d) => d.mode !== 'done')
-    .map((d) => {
-      let g = (((d.u - me.u) % 1) + 1) % 1
-      if (g > 0.5) g -= 1
-      return { d, gap: d === me ? 0 : g * lap }
-    })
-    .sort((a, b) => b.gap - a.gap)
-  const COLS = 'grid grid-cols-[112px_28px_36px_34px_minmax(64px,1fr)_40px] items-center gap-x-2.5 px-2.5'
+  const rows = timingOrder(race)
+  const COLS = 'grid grid-cols-[136px_52px_40px_minmax(0,1fr)] items-center gap-x-3 px-2.5'
   return (
     <div className="min-h-0 tabular-nums">
       <div className={cn(COLS, 'h-[27px] border-b border-white/10 text-white/40')}>
         <span><span className="mr-1 inline-block w-[17px]">#</span>Пилот</span>
-        <span>Карт</span>
         <span>Питы</span>
         <span>Стинт</span>
         <span>Статус</span>
-        <span className="text-right">Трасса</span>
       </div>
       <div className="pt-1">
-        {rows.map(({ d, gap }) => {
+        {rows.map((d) => {
           const cur = d.stints[d.stints.length - 1]
           const kartLaps = Math.max(0, d.lapsDone - cur.start)
           const out = d.pitsDone >= race.settings.pits
           const deadline = !out && d.mode === 'track' && stintInfo(race, d).margin <= 3
-          const st = d === me ? { label: '', tone: 'muted' as const } : publicStatus(race, d)
+          const st = publicStatus(race, d)
+          const label = st.label === 'Едет мимо' ? '' : st.label
           return (
             <div key={d.id} className={cn(COLS, 'h-[26px] rounded-[4px]', d === me && 'bg-white/[0.08]')}>
               <span className="truncate">
                 <span className="mr-1 inline-block w-[17px] text-white/40">{String(d.num).padStart(2, '0')}</span>
                 {d.name}
               </span>
-              <span><KartChip race={race} kart={d.kart} onClick={() => onKart(d.kart)} /></span>
               <span className={out ? 'text-white/40' : ''}>{d.pitsDone} / {race.settings.pits}</span>
               <span className={deadline ? 'text-[#e5484d]' : ''}>{kartLaps}</span>
-              <span className={cn('truncate', st.tone === 'hot' && 'text-[#e5484d]', st.tone === 'muted' && 'text-white/40')}>{st.label}</span>
-              <span className="text-right text-white/40">{d === me ? '' : `${gap > 0 ? '+' : '−'}${Math.abs(gap).toFixed(1)}`}</span>
+              <span className={cn('truncate', st.tone === 'hot' && 'text-[#e5484d]', st.tone === 'muted' && 'text-white/40')}>{label}</span>
             </div>
           )
         })}

@@ -22,7 +22,7 @@
 <circle id="box-1" cx="447.06" cy="1292.06" r="26.06" opacity="0"/>
 <circle id="box-2" cx="505.17" cy="1292.06" r="26.06" opacity="0"/>
 <circle id="box-3" cx="563.28" cy="1292.06" r="26.06" opacity="0"/>
-<rect id="light" x="1046" y="1266" width="40" height="74" rx="20" opacity="0"/>
+<rect id="light" x="1290" y="1020" width="40" height="74" rx="20" opacity="0"/>
 <circle id="decision" cx="1108.5" cy="1060.4" r="9" opacity="0"/>
 <defs>
 <filter id="resin-blur" x="0" y="0" width="1578" height="1578" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">

@@ -27,7 +27,7 @@ export const SHAPE = {
   resinLine: attr('resin line', 'd'),
   line: lineEl ? lineEl.slice(1, 5).map(Number) : [0, 0, 0, 0],
   light: lightEl ? lightEl.slice(1, 5).map(Number) : [0, 0, 0, 0],
-  viewBox: '184 240 1080 1141',
+  viewBox: '184 240 1250 1141',
 }
 
 /** Class colours and the dark label colour that goes on each */
