@@ -3,11 +3,11 @@ import { Pause, Play, Flag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { order, raceLap, type Order, type Race, type Settings } from '@/engine/race'
+import { raceLap, type Order, type Race, type Settings } from '@/engine/race'
 import { stintInfo, timeToDecision, timeToPitIn } from '@/engine/ai'
 import { useSim } from '@/sim/useSim'
 import {
-  CLASS, contenders, fmtTime, ourClass, projectRejoin, setOurClass, us,
+  CLASS, contenders, fmtTime, ourClass, projectRejoin, setOurClass, timingOrder, us,
 } from '@/sim/model'
 import { TrackView } from './TrackView'
 import { TimingTable } from './TimingTable'
@@ -67,7 +67,7 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px] gap-3">
         <div className="flex min-h-0 flex-col gap-3">
-          <Card className="min-h-0 flex-1 py-2">
+          <Card className="min-h-0 flex-1 bg-black py-2">
             <CardContent className="h-full px-2">
               <TrackView race={race} />
             </CardContent>
@@ -99,7 +99,7 @@ function Stat({ label, value, tone }: { label: string; value: React.ReactNode; t
 
 function UsPanel({ race }: { race: Race }) {
   const me = us(race)
-  const pos = order(race).indexOf(me) + 1
+  const pos = timingOrder(race).indexOf(me) + 1
   const si = stintInfo(race, me)
   const cur = me.stints[me.stints.length - 1]
   const onKart = me.lapsDone - cur.start

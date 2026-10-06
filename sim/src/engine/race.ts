@@ -508,14 +508,15 @@ function laneStep(r: Race) {
       d.mode = 'laneOut'
       d.laneT0 = r.t
       d.laneT1 = r.t + r.fromBox
-      d.laneFrom = r.track.pit.boxAt
+      d.laneFrom = r.track.pit.slots[0]
       d.laneTo = 1
     }
     if (d.mode === 'laneOut' && r.t >= d.laneT1) rejoin(r, d)
   }
   waiting.sort((a, b) => a.laneT0 - b.laneT0)
   const first = waiting[0]
-  if (first && r.t >= r.greenAt) {
+  // the next driver takes the first kart only once the light is green and the previous one has left it
+  if (first && r.t >= r.greenAt && !r.drivers.some((o) => o.mode === 'box')) {
     // press the button: take the first kart, ours goes in as the second
     const d = first
     const arrived = d.laneT0

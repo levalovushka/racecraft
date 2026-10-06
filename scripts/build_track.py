@@ -4,10 +4,11 @@ Usage: python3 scripts/build_track.py tracks/premium.svg tracks/premium-std.json
 
 SVG contract (see docs/SIMULATOR.md):
   racing line        closed path, the lap reference (drawn in REVERSE direction for Premium)
-  pitlane            filled ribbon; its two straight end edges are where it joins the track
+  pit racing line    open path from the pit lane entry to the exit, the line karts drive in the lane
   start/fimish       line across the track (id as exported from Figma)
   overtake zone *    filled shapes over the racing line
-  track              filled ribbon, used to cut off the part of the pit lane drawn under it
+  box-1..box-3       circles: parking slots in the box, box-1 is handed out first
+  decision           circle: last point where the pilot can still turn into the pit lane
 
 Output: polyline in race direction starting at the timing line, speed profile,
 markers as lap fractions s in [0,1), pit lane centerline.
@@ -18,17 +19,14 @@ away, compared with staying on track).
 """
 import json, sys
 import numpy as np
-from svgpathtools import svg2paths, Line
+from svgpathtools import svg2paths
 
 # race / calibration targets (Premium, ГГ 2025-26 data, see docs/MECHANICS.md)
 LAP_TIME = 30.0      # s, typical clean lap
 PIT_LOSS = 28.0      # s, pit lap + next lap minus two clean laps, no waiting under red
 STOP_TIME = 25.0     # s, minimal stop, counted from the button press at the box, reg. 10.9
 REACTION = 0.4       # s, from green / manager's go to moving
-PIT_OUT_MAX_S = 0.18 # driver rejoins before the first corner (the drawn lane runs into it)
 DIRECTION = -1       # standard direction runs against the drawn racing line
-DECISION_S = 0.97    # last point to commit to pit entry, lap fraction from the line
-BOX_AT = 0.10        # box/light position along the pit lane (traffic light right after entry)
 
 # kart dynamics (rental Sodi SR5 / Rimo Evo6, rough)
 A_LAT = 13.0         # m/s^2 lateral grip
@@ -96,36 +94,6 @@ def zone_range(pts, zone_path, max_d=40):
     return [round(hits[(k + 1) % len(hits)], 4), round(hits[k], 4)]
 
 
-def inside(poly_list, x, y):
-    """Even-odd point-in-polygon over several closed polylines (track ribbon with holes)."""
-    c = False
-    for poly in poly_list:
-        px, py = poly[:, 0], poly[:, 1]
-        qx, qy = np.roll(px, 1), np.roll(py, 1)
-        hit = ((py > y) != (qy > y)) & (x < (qx - px) * (y - py) / np.where(qy != py, qy - py, 1e-9) + px)
-        c ^= bool(np.count_nonzero(hit) % 2)
-    return c
-
-
-def pit_centerline(path):
-    """Average the two long edges of the ribbon; ends are the two straight Line segments."""
-    segs = list(path)
-    ends = [i for i, s in enumerate(segs) if isinstance(s, Line) and abs(s.start - s.end) < 220
-            and abs(s.start.real - s.end.real) > 1 and abs(s.start.imag - s.end.imag) > 50]
-    assert len(ends) == 2, ends
-    e0, e1 = ends
-    inner = segs[e0 + 1:e1]
-    outer = segs[e1 + 1:] + segs[:e0]
-    def edge(ss, reverse):
-        pts = np.vstack([path_points(s, 50) for s in ss])
-        return pts[::-1] if reverse else pts
-    a, _ = resample(edge(inner, False), 400, False)
-    b, _ = resample(edge(outer, True), 400, False)
-    mid = (a + b) / 2
-    end_mid = [((segs[e].start + segs[e].end) / 2) for e in ends]
-    return mid, [(z.real, z.imag) for z in end_mid]
-
-
 def run_speed(cap, d):
     """Time along an open path with speed caps, limited by acceleration and braking."""
     v = cap.copy()
@@ -136,7 +104,7 @@ def run_speed(cap, d):
     return np.sum(d / np.maximum((v[:-1] + v[1:]) / 2, 0.05))
 
 
-def physical_pit_loss(pts, v, scale, ds_px, lane, i_in, i_out, window=60):
+def physical_pit_loss(pts, v, scale, ds_px, lane, i_in, i_out, box_at, window=60):
     """Pit path (track -> lane with a stop at the box -> track) minus the same span on track."""
     n = len(pts)
     before = pts[np.arange(i_in - window, i_in + 1) % n]
@@ -147,11 +115,16 @@ def physical_pit_loss(pts, v, scale, ds_px, lane, i_in, i_out, window=60):
     cap = np.r_[v[np.arange(i_in - window, i_in + 1) % n],
                 np.minimum(V_MAX, np.sqrt(A_LAT * r_lane * scale)),
                 v[np.arange(i_out, i_out + window + 1) % n]]
-    cap[len(before) + int(BOX_AT * len(lane))] = 0.0
+    cap[len(before) + int(box_at * len(lane))] = 0.0
     t_pit = run_speed(cap, d) + STOP_TIME + REACTION
     idx = np.arange(i_in - window, i_out + window + 1) % n
     t_track = run_speed(v[idx].copy(), np.full(len(idx) - 1, ds_px * scale))
     return float(t_pit - t_track)
+
+
+def svg_circles(svg):
+    import xml.etree.ElementTree as ET
+    return [e.attrib for e in ET.parse(svg).iter() if e.tag.endswith('circle') and e.get('id')]
 
 
 def main(svg, out):
@@ -183,21 +156,19 @@ def main(svg, out):
     dt = ds_px * scale / v
     t_frac = np.r_[0, np.cumsum(dt)[:-1]] / dt.sum()
 
-    pit_mid, pit_ends = pit_centerline(P['pitlane'])
-    s_ends = [nearest_s(pts, *e)[0] for e in pit_ends]
-    s_in, s_out = sorted(s_ends)  # entry is right after the line, exit later in the lap
-    if nearest_s(pts, *pit_ends[0])[0] != s_in:
-        pit_mid, pit_ends = pit_mid[::-1], pit_ends[::-1]
-    # the ribbon is drawn partly under the track: keep only the part off the track
-    ribbon = [path_points(sp, 200) for sp in P['track'].continuous_subpaths()]
-    off = [i for i, (x, y) in enumerate(pit_mid) if not inside(ribbon, x, y)]
-    pit_mid = pit_mid[off[0]:off[-1] + 1]
+    pit_mid, _ = resample(path_points(P['pit racing line'], 400), 400, False)
     if nearest_s(pts, *pit_mid[0])[0] > nearest_s(pts, *pit_mid[-1])[0]:
         pit_mid = pit_mid[::-1]
-    k_out = next(k for k, (x, y) in enumerate(pit_mid) if nearest_s(pts, x, y)[0] >= PIT_OUT_MAX_S)
-    pit_mid = pit_mid[:k_out + 1]
     s_in = nearest_s(pts, *pit_mid[0])[0]
     s_out = nearest_s(pts, *pit_mid[-1])[0]
+    seg = np.r_[0, np.cumsum(np.hypot(*np.diff(pit_mid, axis=0).T))]
+
+    def along(x, y):
+        return float(seg[int(np.argmin(np.hypot(pit_mid[:, 0] - x, pit_mid[:, 1] - y)))] / seg[-1])
+
+    circles = {a.get('id'): (float(a['cx']), float(a['cy'])) for a in svg_circles(svg)}
+    slots = [round(along(*circles[f'box-{i}']), 4) for i in (1, 2, 3)]
+    decision = round(nearest_s(pts, *circles['decision'])[0], 4)
     pit_len_px = np.hypot(*np.diff(pit_mid, axis=0).T).sum()
 
     # time on track between pit entry and exit
@@ -205,7 +176,7 @@ def main(svg, out):
     t_bypass = dt[i_in:i_out].sum()
     L = pit_len_px * scale
     lane_time = PIT_LOSS + t_bypass  # entry to exit when not waiting under red (data)
-    loss_phys = physical_pit_loss(pts, v, scale, ds_px, pit_mid, i_in, i_out)
+    loss_phys = physical_pit_loss(pts, v, scale, ds_px, pit_mid, i_in, i_out, slots[2])
     zones = sorted(zone_range(pts, p) for k, p in P.items() if k and k.startswith('overtake zone'))
 
     cfg = {
@@ -222,7 +193,7 @@ def main(svg, out):
             'line': 0.0,
             'pitIn': round(s_in, 4),
             'pitOut': round(s_out, 4),
-            'decision': DECISION_S,
+            'decision': decision,
         },
         'passZones': zones,
         'track': {
@@ -232,9 +203,10 @@ def main(svg, out):
             'timeFrac': [round(x, 5) for x in t_frac],
         },
         'pitlane': {
-            'xy': [[round(x, 1), round(y, 1)] for x, y in pit_mid[::4]],
+            'xy': [[round(x, 1), round(y, 1)] for x, y in pit_mid[::2]],
             'lengthM': round(L, 1),
-            'boxAt': BOX_AT,
+            'boxAt': slots[2],  # where an arriving kart parks (third slot)
+            'slots': slots,  # parking slots along the lane, first handed out first
             'laneTime': round(float(lane_time), 2),
             'trackBypassTime': round(float(t_bypass), 2),
             'pitLossData': PIT_LOSS,

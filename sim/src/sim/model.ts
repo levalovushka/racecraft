@@ -3,46 +3,37 @@
 import trackJson from '../../../tracks/premium-std.json'
 import svgRaw from '../../../tracks/premium.svg?raw'
 import { classOf, inLane, P, type Driver, type Race } from '@/engine/race'
-import { buildTrack, pitXY, sOfTau, xyOfS, xyOfTau, type TrackJson } from '@/engine/track'
+import { buildTrack, pitXY, xyOfTau, type TrackJson } from '@/engine/track'
 import { expectedWait, hunger, queueBefore, ribbon, stintInfo, timeToPitIn } from '@/engine/ai'
 
 export const TRACK = buildTrack(trackJson as unknown as TrackJson)
 
-function attr(id: string, name: string): string {
-  const m = svgRaw.match(new RegExp(`id="${id}"[^>]*?\\s${name}="([^"]+)"`))
-  return m ? m[1] : ''
+function attr(id: string, name: string, nth = 0): string {
+  const re = new RegExp(`id="${id}"[^>]*?\\s${name}="([^"]+)"`, 'g')
+  const all = [...svgRaw.matchAll(re)]
+  return all[nth]?.[1] ?? ''
 }
 
 const lineEl = svgRaw.match(/<line id="start\/fimish" x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)"/)
+const lightEl = svgRaw.match(/<rect id="light" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/)
+const resinMask = svgRaw.match(/<mask id="resin-mask"[\s\S]*?\sd="([^"]+)"/)
 
+/** Layers of tracks/premium.svg (Figma 2MRW, node 28:3024); racing lines, zones and markers stay invisible */
 export const SHAPE = {
-  track: attr('track', 'd'),
-  pitlane: attr('pitlane', 'd'),
+  course: attr('full course', 'd'),
+  trackOutline: attr('track', 'd'),
+  stroke: attr('stroke', 'd'),
+  resinMask: resinMask ? resinMask[1] : '',
+  resinLine: attr('resin line', 'd'),
   line: lineEl ? lineEl.slice(1, 5).map(Number) : [0, 0, 0, 0],
-  viewBox: (() => {
-    const pts = [...TRACK.xy, ...TRACK.pit.xy]
-    const xs = pts.map((p) => p[0])
-    const ys = pts.map((p) => p[1])
-    const m = 90
-    const x0 = Math.min(...xs) - m
-    const y0 = Math.min(...ys) - m
-    const boxBottom = pitXY(TRACK, TRACK.pit.boxAt)[1] + 170 // room for the box drawn under the pit lane
-    return `${x0} ${y0} ${Math.max(...xs) - x0 + m} ${Math.max(Math.max(...ys) + m, boxBottom) - y0}`
-  })(),
-  zones: TRACK.zones.map(([a, b]) => {
-    const s0 = sOfTau(TRACK, a)
-    let s1 = sOfTau(TRACK, b)
-    if (s1 < s0) s1 += 1
-    const pts: string[] = []
-    for (let s = s0; s <= s1; s += 0.004) pts.push(xyOfS(TRACK, s).join(','))
-    return pts.join(' ')
-  }),
-  decision: xyOfTau(TRACK, TRACK.tauDecision),
-  box: pitXY(TRACK, TRACK.pit.boxAt),
+  light: lightEl ? lightEl.slice(1, 5).map(Number) : [0, 0, 0, 0],
+  viewBox: '184 240 1080 1141',
 }
 
+/** Class colours and the dark label colour that goes on each */
 export const CLASS = ['A', 'B', 'C', 'D']
-export const CLASS_COLOR = ['#10b981', '#0ea5e9', '#f59e0b', '#f43f5e']
+export const CLASS_COLOR = ['#04b630', '#0090ff', '#e79d13', '#e5484d']
+export const CLASS_TEXT = ['#0b2212', '#0f1c2e', '#291800', '#2a1314']
 
 export const us = (r: Race) => r.drivers[0]
 export const ourClass = (r: Race, kart: number) => classOf(us(r).perceived[kart])
@@ -53,17 +44,46 @@ export function setOurClass(r: Race, kart: number, cls: number) {
   us(r).perceived[kart] = CLASS_CENTER[cls]
 }
 
-/** Where to draw a driver */
+const SLOTS = TRACK.pit.slots
+const SLOT_STEP = SLOTS[0] - SLOTS[1] // lane fraction between two parked karts
+
+/** Lane fraction where the k-th waiting driver queues behind the occupied box */
+function queueSpot(r: Race, d: Driver): number {
+  const occupied = r.drivers.some((o) => o.mode === 'box')
+  const waiting = r.drivers.filter((o) => o.mode === 'wait' || o.mode === 'laneIn').sort((a, b) => a.laneT0 - b.laneT0)
+  const k = Math.max(0, waiting.indexOf(d))
+  return TRACK.pit.boxAt - (k + (occupied ? 1 : 0)) * SLOT_STEP
+}
+
+/**
+ * Where to draw a driver. In the lane: drives to the third slot (or queues
+ * behind it while the box is busy), sits in the first slot's kart for the
+ * stop, then drives off along the pit racing line.
+ */
 export function driverXY(r: Race, d: Driver): [number, number] | null {
   if (d.mode === 'done') return null
   if (d.mode === 'track') return xyOfTau(TRACK, d.u)
-  const boxAt = TRACK.pit.boxAt
   const prog = (a: number, b: number) => Math.min(1, Math.max(0, (r.t - d.laneT0) / Math.max(0.01, d.laneT1 - d.laneT0))) * (b - a) + a
-  if (d.mode === 'laneIn') return pitXY(TRACK, prog(0, boxAt))
-  if (d.mode === 'laneOut') return pitXY(TRACK, prog(boxAt, 1))
-  // waiting at the light / standing in the box
-  const [x, y] = pitXY(TRACK, boxAt)
-  return d.mode === 'wait' ? [x + 28, y - 4] : [x, y]
+  if (d.mode === 'laneIn') return pitXY(TRACK, prog(0, queueSpot(r, d)))
+  if (d.mode === 'wait') return pitXY(TRACK, queueSpot(r, d))
+  if (d.mode === 'box') return pitXY(TRACK, SLOTS[0])
+  return pitXY(TRACK, prog(SLOTS[0], 1))
+}
+
+/**
+ * Target slots of the parked karts. While a driver sits in the first kart the
+ * other two stand in slots 2 and 3; once he has left they roll forward to 1 and 2.
+ */
+export function parkedTargets(r: Race): { kart: number; slot: number }[] {
+  const busy = r.drivers.some((o) => o.mode === 'box')
+  return r.box.map((kart, i) => ({ kart, slot: SLOTS[i + (busy ? 1 : 0)] }))
+}
+
+/** Order as live timing shows it: updated at the line, by laps completed, then by who crossed first */
+export function timingOrder(r: Race): Driver[] {
+  const cross = new Map(r.drivers.map((d) => [d.id, d.lapTimes.reduce((a, b) => a + b, 0)]))
+  return r.drivers.slice().sort((a, b) =>
+    b.lapsDone - a.lapsDone || cross.get(a.id)! - cross.get(b.id)! || b.u - a.u)
 }
 
 export interface Status {

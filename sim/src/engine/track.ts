@@ -9,7 +9,7 @@ export interface TrackJson {
   markers: { line: number; pitIn: number; pitOut: number; decision: number }
   passZones: [number, number][]
   track: { samples: number; xy: [number, number][]; speed: number[]; timeFrac: number[] }
-  pitlane: { xy: [number, number][]; lengthM: number; boxAt: number; trackBypassTime: number }
+  pitlane: { xy: [number, number][]; lengthM: number; boxAt: number; slots: number[]; trackBypassTime: number }
   calibration: { lapTime: number }
 }
 
@@ -23,7 +23,7 @@ export interface Track {
   tauPitIn: number
   tauPitOut: number
   zones: [number, number][] // in tau
-  pit: { xy: [number, number][]; cum: number[]; boxAt: number }
+  pit: { xy: [number, number][]; cum: number[]; boxAt: number; slots: number[] } // slots[0] is handed out first, arrivals park at boxAt
   /** Lap with the stop counts to the new stint (reg. 10.10): most of it is driven on the new kart */
   pitLapToNew: boolean
   refLap: number
@@ -56,7 +56,7 @@ export function buildTrack(j: TrackJson): Track {
     tauPitIn: tauOfS(m.pitIn),
     tauPitOut: tauOfS(m.pitOut),
     zones: j.passZones.map(([a, b]) => [tauOfS(a), tauOfS(b)] as [number, number]),
-    pit: { xy: pxy, cum, boxAt: j.pitlane.boxAt },
+    pit: { xy: pxy, cum, boxAt: j.pitlane.boxAt, slots: j.pitlane.slots },
     pitLapToNew: m.pitIn < 1 - m.pitOut,
     refLap: j.calibration.lapTime,
   }

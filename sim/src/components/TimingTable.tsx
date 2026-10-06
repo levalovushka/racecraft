@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
-import { order, type Driver, type Race } from '@/engine/race'
+import type { Driver, Race } from '@/engine/race'
 import { stintInfo } from '@/engine/ai'
-import { CLASS_COLOR, ourClass, publicStatus, us } from '@/sim/model'
+import { CLASS_COLOR, CLASS_TEXT, ourClass, publicStatus, timingOrder, us } from '@/sim/model'
 
 // Timing in the manner of a live timing screen: by position, intervals updated
 // at the line, average over clean laps, colours like F1 (purple = best of the
@@ -36,12 +36,18 @@ function lapStats(r: Race, d: Driver): LapStats {
   }
 }
 
-/** Gap to the car ahead at the line, in seconds, lapped cars included */
-function interval(me: LapStats, ahead: LapStats | null): number | null {
+/**
+ * Gap to the car ahead at the line, in seconds, lapped cars included. If the car
+ * ahead has already crossed the line once more than we have (we are in the pit
+ * lane, or simply slower), the gap is at least the time since that crossing.
+ */
+function interval(me: LapStats, ahead: LapStats | null, now: number): number | null {
   if (!ahead) return null
   const n = me.cross.length
   if (n === 0 || ahead.cross.length < n) return null
-  return me.cross[n - 1] - ahead.cross[n - 1]
+  const atLine = me.cross[n - 1] - ahead.cross[n - 1]
+  if (ahead.cross.length > n) return Math.max(atLine, now - ahead.cross[n])
+  return Math.max(0, atLine)
 }
 
 const fmt = (x: number | null) => (x === null ? '' : x.toFixed(2))
@@ -81,8 +87,8 @@ function Spark({ laps, pitLaps, center }: { laps: number[]; pitLaps: Set<number>
 }
 
 export function TimingTable({ race }: { race: Race }) {
-  const rows = order(race)
-  const stats = new Map(rows.map((d) => [d.id, lapStats(race, d)]))
+  const stats = new Map(race.drivers.map((d) => [d.id, lapStats(race, d)]))
+  const rows = timingOrder(race)
   const bests = [...stats.values()].map((s) => s.best).filter((x): x is number => x !== null)
   const raceBest = bests.length ? Math.min(...bests) : null
   const me = us(race)
@@ -104,7 +110,7 @@ export function TimingTable({ race }: { race: Race }) {
       <div className="border-t border-foreground/10">
         {rows.map((d, i) => {
           const s = stats.get(d.id)!
-          const gap = i === 0 ? null : interval(s, stats.get(rows[i - 1].id)!)
+          const gap = i === 0 ? null : interval(s, stats.get(rows[i - 1].id)!, race.t)
           const cur = d.stints[d.stints.length - 1]
           const onKart = Math.max(0, d.lapsDone - cur.start)
           const out = d.pitsDone >= race.settings.pits
@@ -130,8 +136,8 @@ export function TimingTable({ race }: { race: Race }) {
               </span>
               <span>
                 <span
-                  className="flex size-[18px] items-center justify-center rounded-full text-[10px] font-semibold text-white"
-                  style={{ background: CLASS_COLOR[ourClass(race, d.kart)] }}
+                  className="flex size-[18px] items-center justify-center rounded-full text-[10px] font-semibold tracking-tight"
+                  style={{ background: CLASS_COLOR[ourClass(race, d.kart)], color: CLASS_TEXT[ourClass(race, d.kart)] }}
                 >
                   {race.karts[d.kart].label}
                 </span>
