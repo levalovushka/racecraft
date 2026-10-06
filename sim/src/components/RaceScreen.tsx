@@ -89,7 +89,7 @@ export function RaceScreen({ settings, onFinish, onRestart, onExit }: {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 pt-4 pb-2">
+        <div className="min-h-0 flex-1 px-12 pt-12 pb-8">
           <TrackView race={race} onKart={cycleClass} />
         </div>
         <EventFeed race={race} />
