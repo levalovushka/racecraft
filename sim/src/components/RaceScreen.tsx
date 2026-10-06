@@ -38,39 +38,53 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
   const lap = Math.min(raceLap(race), race.settings.laps)
 
   return (
-    <div className="flex h-screen flex-col gap-3 p-3">
-      <header className="flex items-center gap-4">
-        <div className="text-lg font-semibold tracking-tight">racecraft · Премиум</div>
-        <div className="font-mono text-sm tabular-nums text-muted-foreground">
-          {fmtTime(race.t)} · круг лидера {lap}/{race.settings.laps}
-          {race.flag && <span className="ml-2 text-foreground"><Flag className="inline size-4" /> финиш</span>}
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPaused((p) => !p)} title="Пробел">
-            {paused ? <Play /> : <Pause />}
-            {paused ? 'Пуск' : 'Пауза'}
-          </Button>
-          <div className="flex rounded-lg border p-0.5">
-            {SPEEDS.map((s, i) => (
-              <Button key={s} size="xs" variant={speed === s ? 'secondary' : 'ghost'} onClick={() => setSpeed(s)} title={`Клавиша ${i + 1}`}>
-                {s}×
-              </Button>
-            ))}
-          </div>
-          {race.finished ? (
-            <Button size="sm" onClick={() => onFinish(race)}>Разбор гонки</Button>
-          ) : (
-            <Button size="sm" variant="ghost" onClick={() => onFinish(race)} disabled={!race.flag}>Разбор</Button>
-          )}
-        </div>
-      </header>
-
+    <div className="flex h-screen flex-col p-3">
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px] gap-3">
         <div className="flex min-h-0 flex-col gap-3">
-          <Card className="min-h-0 flex-1 bg-black py-2">
-            <CardContent className="h-full px-2">
+          <Card className="relative min-h-0 flex-1 bg-black py-0">
+            <CardContent className="h-full px-2 pt-12 pb-2">
               <TrackView race={race} />
             </CardContent>
+            <div className="absolute inset-x-2 top-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="icon" onClick={() => setPaused((p) => !p)} title={paused ? 'Пуск (пробел)' : 'Пауза (пробел)'}>
+                  {paused ? <Play /> : <Pause />}
+                </Button>
+                <div className="flex">
+                  {SPEEDS.map((s, i) => (
+                    <button
+                      key={s}
+                      onClick={() => setSpeed(s)}
+                      title={`Клавиша ${i + 1}`}
+                      className={cn('h-8 px-2.5 text-xs font-medium tabular-nums transition-colors', speed === s ? 'text-foreground' : 'text-muted-foreground/60 hover:text-muted-foreground')}
+                    >
+                      {s}×
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 font-mono text-xs tabular-nums text-muted-foreground">
+                <span><span className="text-foreground">{lap}</span> / {race.settings.laps} кругов</span>
+                <span className="opacity-60">{fmtTime(race.t)}</span>
+                {race.flag && <span className="flex items-center gap-1 text-foreground"><Flag className="size-3.5" /> финиш</span>}
+              </div>
+              <div className="flex justify-end">
+                {race.finished ? (
+                  <Button size="lg" onClick={() => onFinish(race)}>Разбор гонки</Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    onClick={() => onFinish(race)}
+                    disabled={!race.flag}
+                    title={race.flag ? undefined : 'Доступно после клетчатого флага'}
+                    className="bg-rose-500/15 text-rose-500 hover:bg-rose-500/25"
+                  >
+                    <Flag /> Закончить
+                  </Button>
+                )}
+              </div>
+            </div>
+            <EventStream race={race} />
           </Card>
           <TimingTable race={race} />
         </div>
@@ -79,7 +93,6 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
           <OrderPanel race={race} command={command} />
           <BoxPanel race={race} />
           <KartsPanel race={race} onChange={sim.refresh} />
-          <LogPanel race={race} />
         </div>
       </div>
     </div>
@@ -280,23 +293,28 @@ function OrderPanel({ race, command }: { race: Race; command: (o: Order) => void
   )
 }
 
-function LogPanel({ race }: { race: Race }) {
-  const items = race.log.slice(-10).reverse()
+// race seconds an event stays on the track view before it is gone
+const EVENT_TTL = 40
+
+function EventStream({ race }: { race: Race }) {
+  const items = race.log.filter((it) => race.t - it.t < EVENT_TTL).slice(-6)
   return (
-    <Card size="sm" className="min-h-0">
-      <CardHeader>
-        <CardTitle>События</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1 text-xs">
-        {items.length === 0 && <div className="text-muted-foreground">Пока тихо</div>}
-        {items.map((it, i) => (
-          <div key={i} className={cn('flex gap-2', it.us && 'font-semibold text-primary')}>
+    <div className="pointer-events-none absolute bottom-3 left-3 flex max-w-[60%] flex-col gap-0.5 text-xs">
+      {items.map((it, i) => {
+        const age = (race.t - it.t) / EVENT_TTL
+        const rank = (items.length - 1 - i) / 6
+        return (
+          <div
+            key={`${it.t}-${it.text}`}
+            className={cn('flex gap-2 animate-in fade-in slide-in-from-bottom-1 duration-300', it.us && 'font-semibold text-primary')}
+            style={{ opacity: Math.max(0, 1 - Math.max(age, rank) ** 2) }}
+          >
             <span className="font-mono tabular-nums text-muted-foreground">{fmtTime(it.t)}</span>
-            <span>{it.text}</span>
+            <span className="truncate">{it.text}</span>
           </div>
-        ))}
-      </CardContent>
-    </Card>
+        )
+      })}
+    </div>
   )
 }
 
