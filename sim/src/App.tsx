@@ -24,7 +24,15 @@ export default function App() {
 
   if (phase.kind === 'setup') return <Setup initial={settings} onStart={start} />
   if (phase.kind === 'race') {
-    return <RaceScreen key={phase.run} settings={settings} onFinish={(race) => setPhase({ kind: 'debrief', race })} />
+    return (
+      <RaceScreen
+        key={phase.run}
+        settings={settings}
+        onFinish={(race) => setPhase({ kind: 'debrief', race })}
+        onRestart={() => start(settings)}
+        onExit={() => setPhase({ kind: 'setup' })}
+      />
+    )
   }
   return (
     <Debrief

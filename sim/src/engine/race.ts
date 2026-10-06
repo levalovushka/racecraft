@@ -138,6 +138,12 @@ export interface LogItem {
   t: number
   text: string
   us?: boolean
+  kind?: 'pit' | 'kart' | 'overtake' | 'flag'
+  driver?: number // who the event is about
+  other?: number // overtake: the other driver
+  ourGain?: boolean // overtake: we passed (true) or were passed (false)
+  from?: number // kart change: kart ids
+  to?: number
 }
 
 export interface Race {
@@ -166,10 +172,13 @@ export interface Race {
 
 // ---------------------------------------------------------------- setup
 
-const NAMES = [
-  'Абрамов', 'Белов', 'Волков', 'Громов', 'Демин', 'Егоров', 'Жуков', 'Зайцев', 'Ильин', 'Карпов',
-  'Лебедев', 'Морозов', 'Новиков', 'Орлов', 'Павлов', 'Романов', 'Соколов', 'Титов', 'Уваров', 'Фомин',
+// Rivals and kart numbers from the design (Figma 2MRW): surname and front number
+const RIVALS: [string, number][] = [
+  ['Куксенко', 1], ['Шик', 19], ['Жолобов', 14], ['Ребенко', 2], ['Семашко', 16],
+  ['Шепелев', 65], ['Калинин', 30], ['Иванов', 33], ['Соколик', 69],
 ]
+const OUR_NUMBER = 88
+const KART_NUMBERS = [1, 6, 54, 80, 41, 3, 11, 2, 52, 12, 60, 4]
 
 export const CLASS_CENTER = [-0.22, -0.07, 0.07, 0.22]
 
@@ -192,11 +201,10 @@ export function createRace(settings: Settings, track: Track): Race {
   const scaled = raw.map((x) => ((x - lo) / (hi - lo)) * range)
   const sorted = scaled.slice().sort((a, b) => a - b)
   const med = (sorted[5] + sorted[6]) / 2
-  const labels = shuffle(Array.from({ length: 16 }, (_, i) => i + 1), seed, K.labels).slice(0, 12)
+  const labels = shuffle(KART_NUMBERS, seed, K.labels)
   const karts: Kart[] = scaled.map((e, i) => ({ id: i, label: labels[i], effect: e - med, boxSince: -600 }))
 
-  const nums = shuffle(Array.from({ length: 20 }, (_, i) => i + 1), seed, K.numbers).slice(0, 10)
-  const names = shuffle(NAMES, seed, K.names)
+  const rivals = shuffle(RIVALS, seed, K.names)
   const draw = shuffle(Array.from({ length: 12 }, (_, i) => i), seed, K.draw)
   if (settings.ourKartClass !== null) {
     // start conditions: give us a kart of the wanted class, swapping it with whoever drew it
@@ -214,8 +222,8 @@ export function createRace(settings: Settings, track: Track): Race {
     const sd = isUs ? P.managerPerceptionSd : P.rivalPerceptionSd
     return {
       id: i,
-      num: nums[i],
-      name: isUs ? settings.ourName.trim() || 'Мы' : names[i],
+      num: isUs ? OUR_NUMBER : rivals[i - 1][1],
+      name: isUs ? settings.ourName.trim() || 'Мы' : rivals[i - 1][0],
       isUs,
       pace: isUs ? settings.ourPace : P.fieldPaceSd * gauss(seed, K.driverPace, i),
       aggr: isUs ? settings.ourAggr : 0.1 + 0.8 * rand(seed, K.driverAggr, i),
@@ -326,8 +334,8 @@ export function raceLap(r: Race): number {
   return Math.max(...r.drivers.map((d) => d.lapsDone)) + 1
 }
 
-function log(r: Race, text: string, us = false) {
-  r.log.push({ t: r.t, text, us })
+function log(r: Race, text: string, us = false, extra: Partial<LogItem> = {}) {
+  r.log.push({ t: r.t, text, us, ...extra })
 }
 
 // ---------------------------------------------------------------- step
@@ -376,6 +384,11 @@ export function step(r: Race, dt = P.dt) {
             cand.set(d.id, cand.get(d.id)! + gap + 0.08 / d.lapT)
             cand.set(ahead.id, cand.get(ahead.id)! - P.passLoss / ahead.lapT)
             d.overtakes++
+            if (d.isUs || ahead.isUs) {
+              const other = d.isUs ? ahead : d
+              log(r, d.isUs ? `Обогнали ${other.name}` : `${other.name} обогнал нас`, true,
+                { kind: 'overtake', driver: other.id, ourGain: d.isUs })
+            }
             continue
           }
         }
@@ -466,7 +479,7 @@ function crossLine(r: Race, d: Driver, u1: number) {
   }
   if (n >= r.settings.laps) {
     r.flag = true
-    log(r, `Клетчатый флаг: ${d.name}`)
+    log(r, `Клетчатый флаг: ${d.name}`, false, { kind: 'flag', driver: d.id })
     finish(r, d, tCross)
     return
   }
@@ -491,7 +504,7 @@ function enterLane(r: Race, d: Driver, u: number) {
   d.pitLapStint = r.track.pitLapToNew ? d.lapsDone : d.lapsDone + 1
   if (d.isUs) {
     r.intent = 'stay'
-    log(r, `${d.name}: въехали в пит-лейн`, true)
+    log(r, 'Мы заехали в питлейн', true, { kind: 'pit', driver: d.id })
   }
 }
 
@@ -540,7 +553,8 @@ function laneStep(r: Race) {
       from, to, wait, boxAfter: [r.box[0], r.box[1]],
     })
     const k = (id: number) => r.karts[id].label
-    log(r, `${d.name}: карт ${k(from)} → ${k(to)}${wait > 0.5 ? `, ждал ${wait.toFixed(1)} с` : ''}`, d.isUs)
+    log(r, `${d.name}: карт ${k(from)} → ${k(to)}${wait > 0.5 ? `, ждал ${wait.toFixed(1)} с` : ''}`, d.isUs,
+      { kind: 'kart', driver: d.id, from, to })
   }
 }
 

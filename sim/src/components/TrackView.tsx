@@ -7,9 +7,9 @@ const SHIFT_TIME = 1.2 // s of race time for a parked kart to roll one slot forw
 const SLOT_STEP = TRACK.pit.slots[0] - TRACK.pit.slots[1]
 const R = 26
 
-function KartDot({ x, y, label, cls, us }: { x: number; y: number; label: number; cls: number; us?: boolean }) {
+function KartDot({ x, y, label, cls, us, onClick }: { x: number; y: number; label: number; cls: number; us?: boolean; onClick?: () => void }) {
   return (
-    <g transform={`translate(${x} ${y})`}>
+    <g transform={`translate(${x} ${y})`} onClick={onClick} className={onClick ? 'cursor-pointer' : undefined}>
       {us && <circle r={R + 6} fill="none" stroke="white" strokeWidth={3} />}
       <circle r={R} fill={CLASS_COLOR[cls]} />
       <text
@@ -48,7 +48,7 @@ function useParked(race: Race) {
   return targets.map(({ kart }) => ({ kart, f: next.get(kart)! }))
 }
 
-export function TrackView({ race }: { race: Race }) {
+export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number) => void }) {
   const red = race.t < race.greenAt
   const [lx1, ly1, lx2, ly2] = SHAPE.line
   const [gx, gy, gw, gh] = SHAPE.light
@@ -92,11 +92,11 @@ export function TrackView({ race }: { race: Race }) {
 
       {parked.map(({ kart, f }) => {
         const [x, y] = pitXY(TRACK, f)
-        return <KartDot key={`k${kart}`} x={x} y={y} label={race.karts[kart].label} cls={ourClass(race, kart)} />
+        return <KartDot key={`k${kart}`} x={x} y={y} label={race.karts[kart].label} cls={ourClass(race, kart)} onClick={onKart && (() => onKart(kart))} />
       })}
 
       {cars.map(({ d, xy }) => (
-        <KartDot key={d.id} x={xy![0]} y={xy![1]} label={race.karts[d.kart].label} cls={ourClass(race, d.kart)} us={d.isUs} />
+        <KartDot key={d.id} x={xy![0]} y={xy![1]} label={race.karts[d.kart].label} cls={ourClass(race, d.kart)} us={d.isUs} onClick={onKart && (() => onKart(d.kart))} />
       ))}
     </svg>
   )
