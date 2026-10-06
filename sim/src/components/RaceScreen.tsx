@@ -2,15 +2,15 @@ import { useEffect } from 'react'
 import { Pause, Play, Flag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { order, raceLap, type Order, type Race, type Settings } from '@/engine/race'
 import { stintInfo, timeToDecision, timeToPitIn } from '@/engine/ai'
 import { useSim } from '@/sim/useSim'
 import {
-  CLASS, contenders, fmtTime, gapToLeader, ourClass, projectRejoin, setOurClass, statusOf, us,
+  CLASS, contenders, fmtTime, ourClass, projectRejoin, setOurClass, us,
 } from '@/sim/model'
 import { TrackView } from './TrackView'
+import { TimingTable } from './TimingTable'
 import { KartBadge } from './KartBadge'
 
 const SPEEDS = [1, 2, 4, 8, 16]
@@ -177,7 +177,7 @@ function BoxPanel({ race }: { race: Race }) {
                 {i === 0 ? 'Претендент' : i === 1 ? 'Запасной' : 'Третий'}
                 <KartBadge label={race.karts[c.d.kart].label} cls={ourClass(race, c.d.kart)} />
                 {c.d.name}
-                <span className="ml-1 text-xs text-muted-foreground">{c.d.commit ? 'едет' : c.hard ? 'твёрдый' : 'мягкий'}</span>
+                <span className="ml-1 text-xs text-muted-foreground">{c.hard ? 'твёрдый' : 'мягкий'}</span>
               </span>
               <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">въезд через {c.tEntry.toFixed(1)} с</span>
             </div>
@@ -276,57 +276,6 @@ function OrderPanel({ race, command }: { race: Race; command: (o: Order) => void
           </div>
         )}
       </CardContent>
-    </Card>
-  )
-}
-
-const TONE: Record<string, string> = {
-  muted: 'text-muted-foreground',
-  ok: 'text-emerald-500',
-  warn: 'text-amber-500',
-  hot: 'text-rose-500 font-semibold',
-  info: 'text-sky-500',
-}
-
-function TimingTable({ race }: { race: Race }) {
-  const rows = order(race)
-  const leader = rows[0]
-  return (
-    <Card size="sm" className="py-1">
-      <Table className="text-xs [&_td]:py-1 [&_th]:h-7">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-8">P</TableHead>
-            <TableHead className="w-16">Карт</TableHead>
-            <TableHead>Пилот</TableHead>
-            <TableHead className="text-right">Круги</TableHead>
-            <TableHead className="text-right">Отрыв</TableHead>
-            <TableHead className="text-right">Последний</TableHead>
-            <TableHead className="text-right">На карте</TableHead>
-            <TableHead className="text-right">Питы</TableHead>
-            <TableHead>Статус</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((d, i) => {
-            const st = statusOf(race, d)
-            const cur = d.stints[d.stints.length - 1]
-            return (
-              <TableRow key={d.id} className={cn(d.isUs && 'bg-primary/10 font-semibold')}>
-                <TableCell>{i + 1}</TableCell>
-                <TableCell><KartBadge label={race.karts[d.kart].label} cls={ourClass(race, d.kart)} /></TableCell>
-                <TableCell>{d.name}</TableCell>
-                <TableCell className="text-right tabular-nums">{d.lapsDone}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{gapToLeader(d, leader)}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{d.lapTimes.at(-1)?.toFixed(2) ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums">{Math.max(0, d.lapsDone - cur.start)}</TableCell>
-                <TableCell className="text-right tabular-nums">{d.pitsDone}</TableCell>
-                <TableCell className={TONE[st.tone]}>{st.label}</TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
     </Card>
   )
 }

@@ -66,29 +66,24 @@ export function driverXY(r: Race, d: Driver): [number, number] | null {
   return d.mode === 'wait' ? [x + 28, y - 4] : [x, y]
 }
 
-export function gapToLeader(d: Driver, leader: Driver): string {
-  if (d === leader) return '—'
-  const laps = leader.lapsDone - d.lapsDone
-  const g = (leader.u - d.u) * TRACK.refLap
-  if (laps >= 1 && leader.u - d.u >= 1) return `+${Math.floor(leader.u - d.u)} кр`
-  return `+${g.toFixed(1)}`
+export interface Status {
+  label: string
+  tone: 'default' | 'muted' | 'hot'
 }
 
-export const HUNGER_LABEL: Record<string, string> = {
-  out: 'вне игры',
-  locked: 'мин. стинт',
-  burning: 'горит',
-  hungry: 'голодный',
-  full: 'сытый',
-}
-
-export function statusOf(r: Race, d: Driver): { label: string; tone: 'muted' | 'warn' | 'hot' | 'info' | 'ok' } {
-  if (d.mode === 'done') return { label: 'финиш', tone: 'muted' }
-  if (inLane(d)) return { label: d.mode === 'wait' ? 'ждёт зелёный' : 'пит-лейн', tone: 'info' }
-  if (d.commit) return { label: 'едет в бокс', tone: 'info' }
-  const h = hunger(r, d, us(r).perceived)
-  const tone = h === 'burning' ? 'hot' : h === 'hungry' ? 'warn' : h === 'full' ? 'ok' : 'muted'
-  return { label: HUNGER_LABEL[h], tone }
+/**
+ * What the manager can tell about a rival from public data only: stint, laps,
+ * the box and his own kart ratings. Rivals' intentions are never shown.
+ */
+export function publicStatus(r: Race, d: Driver): Status {
+  if (d.mode === 'done') return { label: '', tone: 'muted' }
+  if (inLane(d)) return { label: 'В питлейне', tone: 'muted' }
+  if (d.pitsDone >= r.settings.pits) return { label: '', tone: 'muted' }
+  const h = hunger(r, d, us(r).perceived, true)
+  if (h === 'burning') return { label: 'Горит', tone: 'hot' }
+  if (h === 'locked') return { label: `Ещё ${r.settings.minStint - (d.lapsDone - d.stints[d.stints.length - 1].start)} кр`, tone: 'muted' }
+  if (h === 'hungry') return { label: 'Ищет бокс', tone: 'default' }
+  return { label: '', tone: 'muted' }
 }
 
 /**
@@ -107,9 +102,9 @@ export function contenders(r: Race): { d: Driver; tEntry: number; hard: boolean 
   for (const { d, tEntry } of cand) {
     const si = stintInfo(r, d)
     if (!si.eligible) continue
-    const h = hunger(r, d, us(r).perceived)
+    const h = hunger(r, d, us(r).perceived, true)
     const gain = ourClass(r, d.kart) - kc
-    if (h === 'burning' || gain >= 1 || d.commit) out.push({ d, tEntry, hard: h === 'burning' || gain >= 2 || d.commit })
+    if (h === 'burning' || gain >= 1) out.push({ d, tEntry, hard: h === 'burning' || gain >= 2 })
     if (out.length >= 3) break
   }
   return out
@@ -127,7 +122,7 @@ export interface Rejoin {
 export function projectRejoin(r: Race): Rejoin | null {
   const me = us(r)
   if (me.mode !== 'track' || me.pitsDone >= r.settings.pits) return null
-  const queue = queueBefore(r, me)
+  const queue = queueBefore(r, me, true)
   const kart = ribbon(r, queue)[queue.length]
   const wait = expectedWait(r, me, queue)
   const tIn = timeToPitIn(r, me)

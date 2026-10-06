@@ -46,14 +46,18 @@ export function timeToDecision(r: Race, d: Driver): number {
   return f * d.lapT
 }
 
-/** Drivers who will press the button before `d` would: in the lane, or committed and nearer the entry */
-export function queueBefore(r: Race, d: Driver | null): Driver[] {
+/**
+ * Drivers who will press the button before `d` would: in the lane, or committed
+ * and nearer the entry. `publicOnly` drops the committed ones: rivals' decisions
+ * are not visible to the manager until they actually turn into the pit lane.
+ */
+export function queueBefore(r: Race, d: Driver | null, publicOnly = false): Driver[] {
   const mine = d ? timeToPitIn(r, d) : Infinity
   const lane = r.drivers
     .filter((o) => o !== d && (o.mode === 'laneIn' || o.mode === 'wait'))
     .sort((a, b) => a.laneT0 - b.laneT0)
   const committed = r.drivers
-    .filter((o) => o !== d && o.mode === 'track' && o.commit && timeToPitIn(r, o) < mine)
+    .filter((o) => !publicOnly && o !== d && o.mode === 'track' && o.commit && timeToPitIn(r, o) < mine)
     .sort((a, b) => timeToPitIn(r, a) - timeToPitIn(r, b))
   return [...lane, ...committed]
 }
@@ -96,11 +100,11 @@ export function rate(perceived: number[], kart: number): number {
   return classOf(perceived[kart])
 }
 
-export function hunger(r: Race, d: Driver, perceived: number[]): Hunger {
+export function hunger(r: Race, d: Driver, perceived: number[], publicOnly = false): Hunger {
   if (d.pitsDone >= r.settings.pits) return 'out'
   if (inLane(d)) return 'out'
   const si = stintInfo(r, d)
-  const queue = queueBefore(r, d)
+  const queue = queueBefore(r, d, publicOnly)
   if (si.eligible && urgency(r, d, si) <= 1) return 'burning'
   if (!si.eligible) return 'locked'
   const kart = ribbon(r, queue)[queue.length]
