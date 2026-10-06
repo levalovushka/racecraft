@@ -103,7 +103,7 @@ export function publicStatus(r: Race, d: Driver): Status {
   if (h === 'burning') return { label: 'Горит', tone: 'hot' }
   if (h === 'locked') return { label: `Ещё ${r.settings.minStint - (d.lapsDone - d.stints[d.stints.length - 1].start)} кр`, tone: 'muted' }
   if (h === 'hungry') return { label: 'Ищет бокс', tone: 'default' }
-  return { label: 'Едет мимо', tone: 'muted' }
+  return { label: '', tone: 'muted' }
 }
 
 /**

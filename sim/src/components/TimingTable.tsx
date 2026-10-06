@@ -1,9 +1,10 @@
 import { cn } from '@/lib/utils'
 import type { Driver, Race } from '@/engine/race'
-import { CLASS_COLOR, CLASS_TEXT, ourClass, timingOrder, us } from '@/sim/model'
+import { stintInfo } from '@/engine/ai'
+import { CLASS_COLOR, CLASS_TEXT, ourClass, publicStatus, timingOrder, us } from '@/sim/model'
 
-// Timing in the manner of a live timing screen: by position, gaps updated at
-// the line, average over clean laps, colours like F1 (purple = best of the
+// Timing in the manner of a live timing screen: by position, intervals updated
+// at the line, average over clean laps, colours like F1 (purple = best of the
 // race, green = personal best).
 
 interface LapStats {
@@ -33,6 +34,20 @@ function lapStats(r: Race, d: Driver): LapStats {
     last: d.lapTimes.at(-1) ?? null,
     pitLaps,
   }
+}
+
+/**
+ * Gap to the car ahead at the line, in seconds, lapped cars included. If the car
+ * ahead has already crossed the line once more than we have (we are in the pit
+ * lane, or simply slower), the gap is at least the time since that crossing.
+ */
+function interval(me: LapStats, ahead: LapStats | null, now: number): number | null {
+  if (!ahead) return null
+  const n = me.cross.length
+  if (n === 0 || ahead.cross.length < n) return null
+  const atLine = me.cross[n - 1] - ahead.cross[n - 1]
+  if (ahead.cross.length > n) return Math.max(atLine, now - ahead.cross[n])
+  return Math.max(0, atLine)
 }
 
 const fmt = (x: number | null) => (x === null ? '' : x.toFixed(2))
@@ -71,70 +86,74 @@ function Spark({ laps, pitLaps, center }: { laps: number[]; pitLaps: Set<number>
   )
 }
 
-const COLS = 'grid grid-cols-[28px_124px_40px_80px_124px_68px_68px] items-center gap-x-5 px-2.5'
-
-export function KartChip({ race, kart, onClick }: { race: Race; kart: number; onClick?: () => void }) {
-  const c = ourClass(race, kart)
-  const cls = 'flex size-[18px] items-center justify-center rounded-full text-[10px] font-medium tracking-[-0.6px]'
-  const style = { background: CLASS_COLOR[c], color: CLASS_TEXT[c] }
-  if (!onClick) return <span className={cls} style={style}>{race.karts[kart].label}</span>
-  return (
-    <button type="button" onClick={onClick} title="Сменить класс карта" className={cn(cls, 'transition-transform hover:scale-110')} style={style}>
-      {race.karts[kart].label}
-    </button>
-  )
-}
-
-/** Gap to the leader at the line, in seconds, lapped cars included */
-function toLeader(me: LapStats, leader: LapStats): number | null {
-  const n = me.cross.length
-  if (n === 0 || leader.cross.length < n) return null
-  return Math.max(0, me.cross[n - 1] - leader.cross[n - 1])
-}
-
-export function TimingTable({ race, onKart }: { race: Race; onKart: (kart: number) => void }) {
+export function TimingTable({ race }: { race: Race }) {
   const stats = new Map(race.drivers.map((d) => [d.id, lapStats(race, d)]))
   const rows = timingOrder(race)
   const bests = [...stats.values()].map((s) => s.best).filter((x): x is number => x !== null)
   const raceBest = bests.length ? Math.min(...bests) : null
   const me = us(race)
-  const leader = stats.get(rows[0].id)!
 
   return (
-    <div className="text-[12px] tabular-nums">
-      <div className={cn(COLS, 'h-[27px] border-b border-white/10 text-white/40')}>
+    <div className="text-[13px] tabular-nums">
+      <div className="grid grid-cols-[32px_112px_40px_56px_64px_76px_112px_48px_44px_minmax(0,1fr)] gap-x-3 px-2 pb-2 text-muted-foreground">
         <span>P</span>
-        <span><span className="mr-1 inline-block w-[17px]">#</span>Пилот</span>
+        <span><span className="mr-1.5 inline-block w-4">#</span>Пилот</span>
         <span>Карт</span>
-        <span>Лидер</span>
-        <span>Последний круг</span>
+        <span>Отрыв</span>
         <span>Средний</span>
         <span>Лучший</span>
+        <span>Последний круг</span>
+        <span>Питы</span>
+        <span>Стинт</span>
+        <span>Статус</span>
       </div>
-      <div className="pt-1">
+      <div className="border-t border-foreground/10">
         {rows.map((d, i) => {
           const s = stats.get(d.id)!
-          const gap = i === 0 ? null : toLeader(s, leader)
-          const bestTone = s.best !== null && s.best === raceBest ? 'text-[#9a6cff]' : ''
+          const gap = i === 0 ? null : interval(s, stats.get(rows[i - 1].id)!, race.t)
+          const cur = d.stints[d.stints.length - 1]
+          const onKart = Math.max(0, d.lapsDone - cur.start)
+          const out = d.pitsDone >= race.settings.pits
+          const status = publicStatus(race, d)
+          const deadline = !out && d.mode === 'track' && stintInfo(race, d).margin <= 3
+          const bestTone = s.best !== null && s.best === raceBest ? 'text-violet-400' : ''
           const lastTone =
-            s.last === null || s.pitLaps.has(d.lapTimes.length) ? 'text-white/40'
-              : s.last === raceBest ? 'text-[#9a6cff]'
-              : s.last === s.best ? 'text-[#04b630]' : ''
+            s.last === null || s.pitLaps.has(d.lapTimes.length) ? 'text-muted-foreground'
+              : s.last === raceBest ? 'text-violet-400'
+              : s.last === s.best ? 'text-emerald-400' : ''
           return (
-            <div key={d.id} className={cn(COLS, 'h-[26px] rounded-[4px]', d === me && 'bg-white/[0.08]')}>
+            <div
+              key={d.id}
+              className={cn(
+                'grid h-[26px] grid-cols-[32px_112px_40px_56px_64px_76px_112px_48px_44px_minmax(0,1fr)] items-center gap-x-3 rounded-md px-2',
+                d === me && 'bg-foreground/[0.06]',
+              )}
+            >
               <span>{i + 1}</span>
               <span className="truncate">
-                <span className="mr-1 inline-block w-[17px] text-white/40">{String(d.num).padStart(2, '0')}</span>
+                <span className="mr-1.5 inline-block w-4 text-muted-foreground">{String(d.num).padStart(2, '0')}</span>
                 {d.name}
               </span>
-              <span><KartChip race={race} kart={d.kart} onClick={() => onKart(d.kart)} /></span>
-              <span>{i === 0 ? '-' : gap === null ? '' : `+${fmt(gap)}`}</span>
-              <span className="flex items-center gap-1">
-                <span className={cn('w-[34px]', lastTone)}>{fmt(s.last)}</span>
-                <Spark laps={d.lapTimes} pitLaps={s.pitLaps} center={s.avg} />
+              <span>
+                <span
+                  className="flex size-[18px] items-center justify-center rounded-full text-[10px] font-semibold tracking-tight"
+                  style={{ background: CLASS_COLOR[ourClass(race, d.kart)], color: CLASS_TEXT[ourClass(race, d.kart)] }}
+                >
+                  {race.karts[d.kart].label}
+                </span>
               </span>
+              <span>{i === 0 ? '—' : gap === null ? '' : `+${fmt(gap)}`}</span>
               <span>{fmt(s.avg)}</span>
               <span className={bestTone}>{fmt(s.best)}</span>
+              <span className="flex items-center gap-1">
+                <Spark laps={d.lapTimes} pitLaps={s.pitLaps} center={s.avg} />
+                <span className={lastTone}>{fmt(s.last)}</span>
+              </span>
+              <span className={out ? 'text-muted-foreground' : ''}>{d.pitsDone} / {race.settings.pits}</span>
+              <span className={deadline ? 'text-rose-500' : ''}>{onKart}</span>
+              <span className={cn('truncate', status.tone === 'hot' && 'text-rose-500', status.tone === 'muted' && 'text-muted-foreground')}>
+                {status.label}
+              </span>
             </div>
           )
         })}
