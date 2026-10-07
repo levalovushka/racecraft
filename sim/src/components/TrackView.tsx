@@ -70,12 +70,12 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
       </defs>
 
       <path d={SHAPE.course} fillRule="evenodd" fill="#1B1B1B" />
-      <path d={SHAPE.trackOutline} fillRule="evenodd" fill="none" stroke="white" strokeOpacity={0.3} strokeDasharray="12 6" />
+      <path d={SHAPE.trackOutline} fillRule="evenodd" fill="none" stroke="white" strokeOpacity={0.16} strokeDasharray="12 6" />
       {/* "вкат": darker rubbered line, decoration only */}
       <g mask="url(#tv-resin-mask)">
         <path d={SHAPE.resinLine} fill="none" stroke="black" strokeOpacity={0.5} strokeWidth={64} filter="url(#tv-resin-blur)" />
       </g>
-      <path d={SHAPE.stroke} fillRule="evenodd" fill="none" stroke="#8C8C8C" />
+      <path d={SHAPE.stroke} fillRule="evenodd" fill="none" stroke="#5A5A5A" />
       <line x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke="white" strokeDasharray="8 8" />
 
       {/* traffic light: timer only while red */}

@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import { ArrowRight, Pause, Play } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { inLane, raceLap, type Order, type Race, type Settings } from '@/engine/race'
@@ -14,11 +14,6 @@ import { StintRibbon } from './StintRibbon'
 import { Panel, Wordmark } from './kit'
 
 const SPEEDS = [1, 2, 4, 8, 16]
-
-// play and pause swap with a cross-fade; scale and blur only when motion is allowed
-const ICON_SWAP = 'absolute inset-0 transition-[opacity,scale,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)]'
-const ICON_ON = 'opacity-100 scale-100 blur-0'
-const ICON_OFF = 'opacity-0 motion-safe:scale-25 motion-safe:blur-[4px]'
 
 export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinish: (r: Race) => void }) {
   const sim = useSim(settings)
@@ -48,29 +43,39 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
   return (
     <div className="flex h-screen min-h-[40rem] flex-col gap-3 p-3">
       <h1 className="sr-only">Race</h1>
-      <TopBar race={race} paused={paused} speed={speed} onPause={() => setPaused((p) => !p)} onSpeed={setSpeed} onFinish={() => onFinish(race)} />
+      <AppBar race={race} paused={paused} speed={speed} onPause={() => setPaused((p) => !p)} onSpeed={setSpeed} onFinish={() => onFinish(race)} />
       <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_clamp(23rem,28vw,31rem)] gap-3">
         <div className="flex min-h-0 flex-col gap-3">
-          <div className="relative min-h-0 flex-1">
-            <div className="absolute inset-0 px-4 pb-2">
+          <section className="relative min-h-0 flex-1" aria-label="Track">
+            <div className="absolute inset-x-[8%] inset-y-[5%]">
               <TrackView race={race} />
             </div>
+            <RaceState race={race} />
             <Ticker race={race} />
-          </div>
+          </section>
           <Panel className="shrink-0 px-1 pt-1 pb-2">
             <TimingTable race={race} onChange={sim.refresh} />
           </Panel>
         </div>
         <aside className="flex min-h-0 flex-col gap-3">
           <YouPanel race={race} rerate={rerate} />
-          <CallPanel race={race} command={command} rerate={rerate} />
+          <BoxPanel race={race} command={command} rerate={rerate} />
         </aside>
       </main>
     </div>
   )
 }
 
-function TopBar({ race, paused, speed, onPause, onSpeed, onFinish }: {
+/** Solid glyphs, so the transport controls read like the text beside them */
+function PlayIcon() {
+  return <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden><path d="M4 2.6v10.8a.6.6 0 0 0 .9.5l8.6-5.4a.6.6 0 0 0 0-1L4.9 2.1a.6.6 0 0 0-.9.5Z" fill="currentColor" /></svg>
+}
+function PauseIcon() {
+  return <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden><rect x="3.5" y="2.5" width="3" height="11" rx="0.75" fill="currentColor" /><rect x="9.5" y="2.5" width="3" height="11" rx="0.75" fill="currentColor" /></svg>
+}
+
+/** The application: what is loaded and the playback. The race itself lives with the track */
+function AppBar({ race, paused, speed, onPause, onSpeed, onFinish }: {
   race: Race
   paused: boolean
   speed: number
@@ -78,64 +83,64 @@ function TopBar({ race, paused, speed, onPause, onSpeed, onFinish }: {
   onSpeed: (s: number) => void
   onFinish: () => void
 }) {
-  const laps = race.settings.laps
-  const lap = Math.min(raceLap(race), laps)
   return (
-    <header className="grid h-10 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 px-2">
+    <header className="flex h-9 shrink-0 items-center justify-between gap-6 px-2 text-sm">
       <div className="flex min-w-0 items-center gap-4">
         <Wordmark />
-        <span className="truncate caption">Premium · seed {race.settings.seed}</span>
+        <span className="truncate text-muted-foreground">Premium · seed {race.settings.seed}</span>
       </div>
-      <div className="flex items-center gap-4 tnum">
-        <span className="text-sm text-muted-foreground">Lap <span className="text-base font-semibold text-foreground">{lap}</span> / {laps}</span>
-        <div className="h-0.5 w-[clamp(6rem,12vw,14rem)] rounded-full bg-track">
-          <div className="h-full rounded-full bg-foreground" style={{ width: `${(Math.min(race.drivers[0].u, laps) / laps) * 100}%` }} />
-        </div>
-        <span className="w-24 text-sm text-muted-foreground">
-          {race.flag ? 'Flag' : paused && !race.finished ? 'Paused' : fmtTime(race.t)}
-        </span>
-      </div>
-      <div className="flex items-center justify-end gap-1">
-        {!race.finished && (
+      <div className="flex items-center gap-1">
+        {race.flag ? (
+          <Button size="lg" onClick={onFinish} className="px-3.5">Open debrief <ArrowRight /></Button>
+        ) : (
           <>
-            <Button variant="ghost" size="icon" onClick={onPause} title="Space" aria-label={paused ? 'Play' : 'Pause'}>
-              <span className="relative size-4">
-                <Play className={cn(ICON_SWAP, paused ? ICON_ON : ICON_OFF)} />
-                <Pause className={cn(ICON_SWAP, paused ? ICON_OFF : ICON_ON)} />
-              </span>
-            </Button>
-            <div className="flex" role="group" aria-label="Speed">
-              {SPEEDS.map((s, i) => (
-                <button
-                  key={s}
-                  aria-pressed={speed === s}
-                  aria-keyshortcuts={String(i + 1)}
-                  onClick={() => onSpeed(s)}
-                  title={`Key ${i + 1}`}
-                  className={cn('h-8 w-9 rounded-md text-xs tnum transition-colors',
-                    speed === s ? 'font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground')}
-                >
-                  {s}×
-                </button>
-              ))}
-            </div>
+            <button
+              onClick={onPause}
+              aria-label={paused ? 'Play' : 'Pause'}
+              title="Space"
+              className="flex h-8 w-9 items-center justify-center rounded-md text-foreground transition-colors hover:bg-secondary"
+            >
+              {paused ? <PlayIcon /> : <PauseIcon />}
+            </button>
+            {SPEEDS.map((s, i) => (
+              <button
+                key={s}
+                aria-pressed={speed === s}
+                aria-keyshortcuts={String(i + 1)}
+                onClick={() => onSpeed(s)}
+                title={`Key ${i + 1}`}
+                className={cn('h-8 w-10 rounded-md tnum transition-colors',
+                  speed === s ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground')}
+              >
+                {s}×
+              </button>
+            ))}
           </>
-        )}
-        {race.flag && (
-          <Button size="lg" onClick={onFinish} className="ml-2 px-3.5">
-            Debrief <ArrowRight />
-          </Button>
         )}
       </div>
     </header>
   )
 }
 
-function Figure({ label, value, tone }: { label: ReactNode; value: ReactNode; tone?: 'hot' }) {
+/** Lap and clock where a broadcast puts them: over the race, not in the app chrome */
+function RaceState({ race }: { race: Race }) {
+  const n = race.settings.laps
+  const lap = Math.min(raceLap(race), n)
+  return (
+    <div className="absolute top-1 left-2 tnum">
+      <div className="text-figure font-medium">
+        {race.flag ? 'Chequered flag' : <>Lap {lap} <span className="text-muted-foreground">/ {n}</span></>}
+      </div>
+      <div className="mt-0.5 caption">{fmtTime(race.t)}</div>
+    </div>
+  )
+}
+
+function Figure({ label, value }: { label: ReactNode; value: ReactNode }) {
   return (
     <div className="min-w-0">
       <div className="truncate caption">{label}</div>
-      <div className={cn('mt-1 text-figure font-medium tnum', tone === 'hot' && 'text-hot')}>{value}</div>
+      <div className="mt-1 text-figure font-medium tnum">{value}</div>
     </div>
   )
 }
@@ -154,6 +159,11 @@ function YouPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void
   const out = me.pitsDone >= s.pits
   const latest = s.laps - (s.pits - me.pitsDone) * s.minStint
 
+  // our clean-lap average against the median of everyone else's
+  const others = rows.filter((r) => r.d !== me && r.stats.avg !== null).map((r) => r.stats.avg!).sort((a, b) => a - b)
+  const field = others.length ? others[Math.floor(others.length / 2)] : null
+  const pace = mine.stats.avg !== null && field !== null ? mine.stats.avg - field : null
+
   let status: string
   let hot = false
   if (me.mode === 'done') status = 'Finished'
@@ -167,23 +177,38 @@ function YouPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void
 
   return (
     <Panel className="shrink-0 p-4">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-medium">{me.name} <span className="font-normal text-muted-foreground">#{me.num}</span></h2>
-          <div className="mt-1 text-display font-medium tnum">P{mine.pos}</div>
+          <h2 className="flex items-center gap-2 text-sm font-medium">
+            <span className="truncate">{me.name}</span>
+            <span className="font-normal text-muted-foreground">#{me.num}</span>
+            <Kart label={race.karts[me.kart].label} cls={ourClass(race, me.kart)} onClick={() => rerate(me.kart)} />
+          </h2>
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <Figure label="Last lap" value={fmtLap(mine.stats.last) || '—'} />
+            <Figure label="Best" value={fmtLap(mine.stats.best) || '—'} />
+            <Figure label="Pace vs field" value={pace === null ? '—' : Math.abs(pace) < 0.005 ? 'even' : <>{Math.abs(pace).toFixed(2)} <span className="text-sm font-normal text-muted-foreground">{pace < 0 ? 'faster' : 'slower'}</span></>} />
+          </div>
         </div>
-        <Kart size="lg" label={race.karts[me.kart].label} cls={ourClass(race, me.kart)} onClick={() => rerate(me.kart)} />
+        <div className="text-display font-medium tnum">P{mine.pos}</div>
       </div>
 
-      <div className="mt-5 grid grid-cols-4 gap-3">
-        <Figure label="Last lap" value={fmtLap(mine.stats.last) || '—'} />
-        <Figure label="Best" value={fmtLap(mine.stats.best) || '—'} />
-        <Figure label={ahead ? `↑ ${ahead.d.name}` : 'Ahead'} value={mine.gap === null ? '—' : `${fmtLap(mine.gap)}`} />
-        <Figure label={behind ? `↓ ${behind.d.name}` : 'Behind'} value={behind?.gap == null ? '—' : `${fmtLap(behind.gap)}`} />
-      </div>
+      {/* the drivers on either side, as a battle graphic does it */}
+      <ol className="mt-4 text-sm tnum" aria-label="Around you">
+        {[ahead, mine, behind].map((r) => r && (
+          <li key={r.d.id} className={cn('grid h-7 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2 border-t', r === mine ? 'font-semibold' : 'text-muted-foreground')}>
+            <span>{r.pos}</span>
+            <span className={cn('truncate', r !== mine && 'text-foreground')}>{r === mine ? 'You' : r.d.name}</span>
+            <span>
+              {r === ahead && mine.gap !== null && <><span className="text-foreground">{fmtLap(mine.gap)}</span> ahead</>}
+              {r === behind && behind.gap !== null && <><span className="text-foreground">{fmtLap(behind.gap)}</span> behind</>}
+            </span>
+          </li>
+        ))}
+      </ol>
 
       <StintRibbon
-        className="mt-5"
+        className="mt-4"
         laps={s.laps}
         stints={me.stints.map((x) => ({
           from: x.start,
@@ -210,13 +235,14 @@ const ORDERS: { value: Order; label: string; key: string }[] = [
 ]
 const ORDER_LABEL: Record<Order, string> = { stay: 'stay out', box: 'box', boxIfClear: 'box if clear' }
 
-/** The box and the call to the driver: what is in it, who takes it, what a stop now gives us, the order */
-function CallPanel({ race, command, rerate }: { race: Race; command: (o: Order) => void; rerate: (kart: number) => void }) {
+/**
+ * One question, read top to bottom: what is in the box, will it still be there
+ * when we get to the entry, what a stop now gives us, and the call.
+ */
+function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) => void; rerate: (kart: number) => void }) {
   const me = us(race)
   const red = race.t < race.greenAt
   const [first, second] = race.box
-  const cont = contenders(race).slice(0, 2)
-  const anyEligible = race.drivers.some((d) => d.mode === 'track' && d.pitsDone < race.settings.pits && stintInfo(race, d).eligible)
 
   const tDec = timeToDecision(race, me)
   const tIn = timeToPitIn(race, me)
@@ -230,56 +256,66 @@ function CallPanel({ race, command, rerate }: { race: Race; command: (o: Order) 
   const rejoin = projectRejoin(race)
   const early = race.intent !== 'stay' && !locked && !stintInfo(race, me).eligible
 
+  // who gets to the entry before us and would take the kart
+  const cont = contenders(race)
+  const before = (locked ? cont : cont.filter((c) => !c.d.isUs && c.tEntry < tIn)).slice(0, 2)
+  const anyEligible = race.drivers.some((d) => d.mode === 'track' && d.pitsDone < race.settings.pits && stintInfo(race, d).eligible)
+
   return (
     <Panel className="flex min-h-0 flex-1 flex-col p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium">Box</h2>
         <span className={cn('flex items-center gap-2 text-sm tnum', red ? 'text-hot' : 'text-muted-foreground')}>
-          <span className={cn('size-2 rounded-full', red ? 'bg-hot' : 'bg-ok')} />
+          <span className={cn('size-2 rounded-full', red ? 'bg-hot' : 'bg-ok')} aria-hidden />
           {red ? `Red · ${Math.ceil(race.greenAt - race.t)} s` : 'Green'}
         </span>
       </div>
 
-      <div className="mt-4 flex items-end gap-8">
-        <div>
+      <div className="mt-3 flex items-end gap-5">
+        <div className="grid justify-items-center gap-1.5">
           <Kart size="xl" label={race.karts[first].label} cls={ourClass(race, first)} onClick={() => rerate(first)} />
-          <div className="mt-2 caption">Next out</div>
+          <span className="caption">Next</span>
         </div>
-        <div>
+        <div className="grid justify-items-center gap-1.5">
           <Kart size="lg" label={race.karts[second].label} cls={ourClass(race, second)} onClick={() => rerate(second)} />
-          <div className="mt-2 caption">Then</div>
+          <span className="caption">Then</span>
         </div>
       </div>
 
       <div className="mt-6">
-        <div className="caption">Who takes {race.karts[first].label}</div>
-        <div className="mt-2 grid h-[3.25rem] content-start gap-1.5 text-sm">
-          {cont.length === 0 ? (
-            <span className="text-muted-foreground">
-              {race.flag ? 'Box is closed' : anyEligible ? 'Nobody wants it' : 'Nobody can stop yet: min stint'}
-            </span>
-          ) : cont.map((c, i) => (
-            <div key={c.d.id} className={cn('flex items-baseline justify-between gap-3', i > 0 && !c.d.isUs && 'text-muted-foreground', c.d.isUs && 'font-semibold')}>
-              <span className="truncate">{c.d.isUs ? 'You' : c.d.name}{i === 1 && <span className="font-normal text-muted-foreground"> · if not</span>}</span>
-              <span className="shrink-0 tnum">{c.hard ? '' : <span className="text-muted-foreground">maybe · </span>}in {c.tEntry.toFixed(1)} s</span>
-            </div>
+        <h3 className="caption">{locked ? `Next to take ${race.karts[first].label}` : `Before you at the entry`}</h3>
+        <ul className="mt-2 grid h-[3.25rem] content-start gap-1.5 text-sm tnum">
+          {before.length === 0 ? (
+            <li className="text-muted-foreground">
+              {race.flag ? 'Box is closed'
+                : !anyEligible ? 'Nobody can stop yet'
+                : locked ? 'Nobody wants it'
+                : `Nobody wants ${race.karts[first].label}`}
+            </li>
+          ) : before.map((c) => (
+            <li key={c.d.id} className="flex items-baseline justify-between gap-3">
+              <span className="truncate">{c.d.name}<span className="text-muted-foreground"> {c.hard ? 'takes' : 'may take'} {race.karts[first].label}</span></span>
+              <span className="shrink-0 text-muted-foreground">in {c.tEntry.toFixed(1)} s</span>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
 
-      <div className="mt-6">
-        <div className="caption">If you box now</div>
-        <div className="mt-2 flex h-6 items-center gap-2 text-sm tnum">
+      <div className="mt-4">
+        <h3 className="caption">If you box now</h3>
+        <div className="mt-2 flex min-h-8 items-center gap-2 text-sm tnum">
           {rejoin && !locked ? (
             <>
+              <Kart label={race.karts[me.kart].label} cls={ourClass(race, me.kart)} />
+              <ArrowRight className="size-3.5 text-muted-foreground" aria-label="for" />
               <Kart label={race.karts[rejoin.kart].label} cls={ourClass(race, rejoin.kart)} />
-              <span className={rejoin.wait > 0.5 ? 'text-hot' : 'text-muted-foreground'}>
-                {rejoin.wait > 0.5 ? `wait ${rejoin.wait.toFixed(0)} s` : 'no wait'}
+              <span className="ml-auto text-right">
+                <span className={rejoin.wait > 0.5 ? 'text-hot' : 'text-muted-foreground'}>{rejoin.wait > 0.5 ? `wait ${Math.round(rejoin.wait)} s` : 'no wait'}</span>
+                {rejoin.ahead && <span className="text-muted-foreground"> · out behind <span className="text-foreground">{rejoin.ahead.d.name}</span></span>}
               </span>
-              {rejoin.ahead && <span className="ml-auto truncate text-muted-foreground">out behind <span className="text-foreground">{rejoin.ahead.d.name}</span></span>}
             </>
           ) : (
-            <span className="text-muted-foreground">{race.flag ? 'Race is over' : done ? 'All stops done' : 'In the pit lane'}</span>
+            <span className="text-muted-foreground">{race.flag ? 'Race is over' : done ? 'All stops done' : 'You are in the pit lane'}</span>
           )}
         </div>
       </div>

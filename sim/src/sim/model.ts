@@ -102,7 +102,7 @@ export function publicStatus(r: Race, d: Driver): Status {
   if (d.pitsDone >= r.settings.pits) return { label: '', tone: 'muted' }
   const h = hunger(r, d, us(r).perceived, true)
   if (h === 'burning') return { label: 'Burning', tone: 'hot' }
-  if (h === 'locked') return { label: `Min stint · ${laps(r.settings.minStint - (d.lapsDone - d.stints[d.stints.length - 1].start))}`, tone: 'muted' }
+  if (h === 'locked') return { label: `${laps(r.settings.minStint - (d.lapsDone - d.stints[d.stints.length - 1].start))} to min`, tone: 'muted' }
   if (h === 'hungry') return { label: 'Wants a kart', tone: 'default' }
   return { label: '', tone: 'muted' }
 }

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import type { Settings } from '@/engine/race'
 import { cn } from '@/lib/utils'
-import { CLASS, CLASS_COLOR, CLASS_TEXT } from '@/sim/model'
+import { CLASS, CLASS_COLOR } from '@/sim/model'
 import { Wordmark } from './kit'
 
 const one = (v: number | readonly number[]) => (Array.isArray(v) ? v[0] : (v as number))
@@ -119,13 +119,12 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
                         <button
                           key={c}
                           aria-pressed={on}
+                          aria-label={`Class ${c}`}
+                          title={`Class ${c}`}
                           onClick={() => set('ourKartClass', i)}
-                          className={cn('flex h-8 items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors',
-                            !on && 'text-muted-foreground hover:bg-secondary hover:text-foreground')}
-                          style={on ? { background: CLASS_COLOR[i], color: CLASS_TEXT[i] } : undefined}
+                          className={cn('flex h-8 items-center justify-center rounded-md transition-colors', on ? 'bg-selected' : 'hover:bg-secondary')}
                         >
-                          {!on && <span className="size-2 rounded-full" style={{ background: CLASS_COLOR[i] }} aria-hidden />}
-                          {c}
+                          <span className={cn('size-4 rounded-full transition-opacity', !on && 'opacity-60')} style={{ background: CLASS_COLOR[i] }} />
                         </button>
                       )
                     })}

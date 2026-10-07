@@ -7,7 +7,7 @@ import {
   interestingDecisions, lossBreakdown, runBot, score, stintViews,
   type DecisionValue, type DecisionView, type StintView,
 } from '@/engine/analysis'
-import { CLASS, fmtTime, laps, TRACK } from '@/sim/model'
+import { CLASS, CLASS_COLOR, fmtTime, laps, TRACK } from '@/sim/model'
 import { Kart } from './KartBadge'
 import { StintRibbon } from './StintRibbon'
 import { Panel, Wordmark } from './kit'
@@ -197,7 +197,9 @@ function StintsRow({ title, rows, laps: total }: { title: string; rows: StintVie
           <li key={i} className="flex items-center gap-2 text-xs">
             <Kart label={s.label} cls={s.trueClass} />
             <span className="text-muted-foreground tnum">
-              {laps(s.laps)}{s.ourClass !== s.trueClass && <> · you rated {CLASS[s.ourClass]}</>}
+              {laps(s.laps)}{s.ourClass !== s.trueClass && (
+                <> · you rated it <span className="ml-0.5 inline-block size-2 rounded-full align-middle" style={{ background: CLASS_COLOR[s.ourClass] }} role="img" aria-label={`class ${CLASS[s.ourClass]}`} /></>
+              )}
             </span>
           </li>
         ))}

@@ -6,7 +6,7 @@ import { fmtLap, timing } from '@/sim/timing'
 import { Kart } from './KartBadge'
 
 // column widths: position, driver, kart, interval, last, best, average, stint, stops, status
-const COLS = ['2.25rem', '22%', '4.25rem', '11%', '10%', '10%', '10%', '7%', '7%', 'auto']
+const COLS = ['2.25rem', '18%', '3.5rem', '10%', '9%', '9%', '9%', '7%', '7%', 'auto']
 const TH = 'h-8 px-2 text-left align-middle font-normal caption'
 const TD = 'h-[clamp(1.5rem,3.2vh,1.875rem)] border-t px-2 align-middle'
 
@@ -59,7 +59,7 @@ export function TimingTable({ race, onChange }: { race: Race; onChange: () => vo
               <td className={cn(TD, 'text-right text-muted-foreground')}>{fmtLap(s.avg)}</td>
               <td className={cn(TD, 'text-right', deadline && 'text-hot')}>{Math.max(0, d.lapsDone - d.stints[d.stints.length - 1].start)}</td>
               <td className={cn(TD, 'text-right', out && 'text-muted-foreground')}>{d.pitsDone}/{N}</td>
-              <td className={cn(TD, 'truncate pl-5 font-normal', status.tone === 'hot' ? 'text-hot' : 'text-muted-foreground')}>{status.label}</td>
+              <td title={status.label} className={cn(TD, 'truncate pl-5 font-normal', status.tone === 'hot' ? 'text-hot' : 'text-muted-foreground')}>{status.label}</td>
             </tr>
           )
         })}
