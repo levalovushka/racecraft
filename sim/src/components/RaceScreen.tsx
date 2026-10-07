@@ -39,7 +39,7 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
       <TopBar race={race} paused={paused} speed={speed} onPause={() => setPaused((p) => !p)} onSpeed={setSpeed} onFinish={() => onFinish(race)} />
       <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_clamp(22rem,27vw,30rem)] gap-3">
         <div className="@container flex min-h-0 flex-col gap-3">
-          <Panel className="relative min-h-0 flex-1 overflow-hidden bg-[oklch(0.115_0.002_286)]">
+          <Panel className="relative min-h-0 flex-1 overflow-hidden bg-background">
             <div className="absolute inset-y-0 left-0 right-[9.5rem] p-4">
               <TrackView race={race} />
             </div>

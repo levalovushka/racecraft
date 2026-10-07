@@ -102,13 +102,3 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
   )
 }
 
-/** The course alone, for decoration */
-export function TrackOutline({ className }: { className?: string }) {
-  return (
-    <svg viewBox={SHAPE.viewBox} className={className} aria-hidden>
-      <path d={SHAPE.course} fillRule="evenodd" fill="currentColor" fillOpacity={0.022} />
-      <path d={SHAPE.stroke} fillRule="evenodd" fill="none" stroke="currentColor" strokeOpacity={0.09} strokeWidth={2} />
-      <path d={SHAPE.trackOutline} fillRule="evenodd" fill="none" stroke="currentColor" strokeOpacity={0.05} strokeDasharray="12 6" />
-    </svg>
-  )
-}
