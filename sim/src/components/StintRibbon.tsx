@@ -45,7 +45,7 @@ export function StintRibbon({ laps, stints, now, locked, deadline, showLabels, c
         )}
       </div>
       {deadline != null && deadline >= 0 && deadline <= laps && (
-        <div className="absolute -top-1 h-4 w-0.5 -translate-x-1/2 rounded-full bg-hot" style={{ left: x(deadline) }} title={`Последний круг для пита: ${deadline + 1}`} />
+        <div className="absolute -top-1 h-4 w-0.5 -translate-x-1/2 rounded-full bg-hot" style={{ left: x(deadline) }} title={`Last lap to start a stop: ${deadline + 1}`} />
       )}
       {now != null && (
         <div className="absolute -top-1 h-4 w-0.5 -translate-x-1/2 rounded-full bg-foreground shadow-[0_0_0_2px_var(--card)]" style={{ left: x(now) }} />
@@ -54,7 +54,7 @@ export function StintRibbon({ laps, stints, now, locked, deadline, showLabels, c
         <div className="relative mt-1.5 h-4 text-[0.6875rem] text-muted-foreground tnum">
           {stints.map((s, i) => (
             <span key={i} className="absolute truncate pl-0.5" style={{ left: x(s.from), width: w(s.from, s.to) }}>
-              {s.label} · {Math.round(s.to - s.from)} кр
+              {s.label} · {Math.round(s.to - s.from)} laps
             </span>
           ))}
         </div>

@@ -59,7 +59,7 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
     .sort((a, b) => Number(a.d.isUs) - Number(b.d.isUs))
 
   return (
-    <svg viewBox={SHAPE.viewBox} className="h-full w-full select-none" role="img" aria-label="Схема трассы">
+    <svg viewBox={SHAPE.viewBox} className="h-full w-full select-none" role="img" aria-label="Track map">
       <defs>
         <mask id="tv-resin-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1578" height="1578" style={{ maskType: 'alpha' }}>
           <path d={SHAPE.resinMask} fillRule="evenodd" fill="#191919" />

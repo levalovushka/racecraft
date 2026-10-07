@@ -32,6 +32,7 @@ export const SHAPE = {
 
 /** Class colours and the dark label colour that goes on each */
 export const CLASS = ['A', 'B', 'C', 'D']
+export const CLASS_NAME = ['A — top of the field', 'B — above average', 'C — below average', 'D — tail of the field']
 export const CLASS_COLOR = ['#04b630', '#0090ff', '#e79d13', '#e5484d']
 export const CLASS_TEXT = ['#0b2212', '#0f1c2e', '#291800', '#2a1314']
 
@@ -97,12 +98,12 @@ export interface Status {
  */
 export function publicStatus(r: Race, d: Driver): Status {
   if (d.mode === 'done') return { label: '', tone: 'muted' }
-  if (inLane(d)) return { label: 'В питлейне', tone: 'muted' }
+  if (inLane(d)) return { label: 'In pits', tone: 'muted' }
   if (d.pitsDone >= r.settings.pits) return { label: '', tone: 'muted' }
   const h = hunger(r, d, us(r).perceived, true)
-  if (h === 'burning') return { label: 'Горит', tone: 'hot' }
-  if (h === 'locked') return { label: `Ещё ${r.settings.minStint - (d.lapsDone - d.stints[d.stints.length - 1].start)} кр`, tone: 'muted' }
-  if (h === 'hungry') return { label: 'Ищет бокс', tone: 'default' }
+  if (h === 'burning') return { label: 'Burning', tone: 'hot' }
+  if (h === 'locked') return { label: `Min stint −${r.settings.minStint - (d.lapsDone - d.stints[d.stints.length - 1].start)}`, tone: 'muted' }
+  if (h === 'hungry') return { label: 'Wants a kart', tone: 'default' }
   return { label: '', tone: 'muted' }
 }
 

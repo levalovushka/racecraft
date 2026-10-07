@@ -49,14 +49,14 @@ function Field({ label, value, children, hint }: { label: string; value?: ReactN
 
 function Ends({ left, right }: { left: string; right: string }) {
   return (
-    <div className="-mt-0.5 flex justify-between text-[0.6875rem] text-faint">
+    <div className="-mt-0.5 flex justify-between caption">
       <span>{left}</span>
       <span>{right}</span>
     </div>
   )
 }
 
-const RULES = ['Премиум', '60 кругов', 'мин. стинт 10', '2 смены', 'стоп 25 с']
+const RULES = ['Premium', '60 laps', 'min stint 10', '2 kart changes', '25 s stop']
 
 export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Settings) => void }) {
   const [s, setS] = useState(initial)
@@ -74,9 +74,9 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
 
   const startToggle = (
     <Segmented
-      label="Старт"
+      label="Start"
       value={custom ? 'custom' : 'draw'}
-      options={[{ value: 'draw', label: 'Старт как выпал' }, { value: 'custom', label: 'Задать старт' }]}
+      options={[{ value: 'draw', label: 'Drawn start' }, { value: 'custom', label: 'Set start' }]}
       onChange={(v) => setS((x) => (v === 'draw' ? { ...x, gridPos: null, ourKartClass: null } : { ...x, gridPos: x.gridPos ?? 10, ourKartClass: x.ourKartClass ?? 2 }))}
     />
   )
@@ -85,25 +85,25 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
     <div className="flex min-h-screen items-center justify-center px-6 py-10">
       <div className="w-full max-w-[27rem]">
         <Wordmark className="text-base [&_svg]:size-5" />
-        <h1 className="mt-6 text-[2rem] leading-tight font-semibold tracking-tight">Симулятор менеджера</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Разбор после финиша — против бота на той же раздаче.</p>
-        <p className="mt-4 text-xs text-faint">{RULES.join(' · ')}</p>
+        <h1 className="mt-6 text-[2rem] leading-tight font-semibold tracking-tight">Pit manager</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Call the stops. Compare with a bot on the same seed.</p>
+        <p className="mt-4 caption">{RULES.join(' · ')}</p>
 
-        <div className="mt-6 grid gap-6 rounded-2xl border bg-card p-6">
+        <div className="mt-7 grid gap-6 rounded-2xl bg-card p-6">
           <div className="grid gap-2">
-            <Input value={s.ourName} maxLength={24} onChange={(e) => set('ourName', e.target.value)} placeholder="Фамилия пилота" aria-label="Фамилия пилота" className="h-9" />
+            <Input value={s.ourName} maxLength={24} onChange={(e) => set('ourName', e.target.value)} placeholder="Driver surname" aria-label="Driver surname" className="h-9" />
             {startToggle}
             {custom && (
               <div className="mt-1 grid gap-3">
                 <div className="grid gap-1.5">
-                  <span className="text-xs text-muted-foreground">Позиция на решётке</span>
+                  <span className="text-xs text-muted-foreground">Grid position</span>
                   <div className="grid grid-cols-10 gap-1">
                     {Array.from({ length: 10 }, (_, i) => i + 1).map((p) => (
                       <button
                         key={p}
                         onClick={() => set('gridPos', p)}
                         className={cn('h-8 rounded-md text-sm tnum transition-colors',
-                          s.gridPos === p ? 'bg-foreground font-semibold text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}
+                          s.gridPos === p ? 'bg-foreground font-semibold text-background' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}
                       >
                         {p}
                       </button>
@@ -111,7 +111,7 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
                   </div>
                 </div>
                 <div className="grid gap-1.5">
-                  <span className="text-xs text-muted-foreground">Класс стартового карта</span>
+                  <span className="text-xs text-muted-foreground">Starting kart class</span>
                   <div className="grid grid-cols-4 gap-1">
                     {CLASS.map((c, i) => {
                       const on = s.ourKartClass === i
@@ -120,7 +120,7 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
                           key={c}
                           onClick={() => set('ourKartClass', i)}
                           className={cn('flex h-8 items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors',
-                            !on && 'text-muted-foreground hover:bg-muted hover:text-foreground')}
+                            !on && 'text-muted-foreground hover:bg-secondary hover:text-foreground')}
                           style={on ? { background: CLASS_COLOR[i], color: CLASS_TEXT[i] } : undefined}
                         >
                           {!on && <span className="size-2 rounded-full" style={{ background: CLASS_COLOR[i] }} />}
@@ -134,27 +134,27 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
             )}
           </div>
 
-          <Field label="Темп" value={pace === 0 ? 'как поле' : `${pace < 0 ? '−' : '+'}${Math.abs(pace).toFixed(2)} с/круг`}>
-            <Slider min={-0.4} max={0.4} step={0.05} value={[pace]} onValueChange={(v) => set('ourPace', Math.round(one(v) * 100) / 100)} aria-label="Темп пилота" />
-            <Ends left="быстрее поля" right="медленнее" />
+          <Field label="Pace" value={pace === 0 ? 'field average' : `${pace < 0 ? '−' : '+'}${Math.abs(pace).toFixed(2)} s/lap`}>
+            <Slider min={-0.4} max={0.4} step={0.05} value={[pace]} onValueChange={(v) => set('ourPace', Math.round(one(v) * 100) / 100)} aria-label="Driver pace" />
+            <Ends left="faster" right="slower" />
           </Field>
 
-          <Field label="Агрессия в борьбе" value={s.ourAggr.toFixed(1)}>
-            <Slider min={0} max={1} step={0.1} value={[s.ourAggr]} onValueChange={(v) => set('ourAggr', Math.round(one(v) * 10) / 10)} aria-label="Агрессия" />
-            <Ends left="сидит за спиной" right="атакует сразу" />
+          <Field label="Aggression" value={s.ourAggr.toFixed(1)}>
+            <Slider min={0} max={1} step={0.1} value={[s.ourAggr]} onValueChange={(v) => set('ourAggr', Math.round(one(v) * 10) / 10)} aria-label="Aggression" />
+            <Ends left="sits behind" right="attacks at once" />
           </Field>
 
-          <Field label="Раздача">
+          <Field label="Seed">
             <div className="flex gap-2">
-              <Input type="number" value={s.seed} onChange={(e) => set('seed', Number(e.target.value) || 1)} aria-label="Номер раздачи" className="h-9 tnum" />
+              <Input type="number" value={s.seed} onChange={(e) => set('seed', Number(e.target.value) || 1)} aria-label="Seed" className="h-9 tnum" />
               <Button variant="outline" className="h-9" onClick={() => set('seed', Math.floor(Math.random() * 1e6))}>
-                <Dices /> Случайная
+                <Dices /> Random
               </Button>
             </div>
           </Field>
 
           <Button className="h-11 w-full text-[0.9375rem] font-semibold" onClick={() => onStart(s)}>
-            Старт гонки <ArrowRight />
+            Start race <ArrowRight />
           </Button>
         </div>
       </div>

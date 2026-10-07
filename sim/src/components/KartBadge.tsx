@@ -1,29 +1,45 @@
 import { cn } from '@/lib/utils'
 import { CLASS, CLASS_COLOR, CLASS_TEXT } from '@/sim/model'
 
-/** Kart number on its class colour, with the class letter unless `bare` */
-export function KartBadge({ label, cls, dim, bare, size = 'md', className }: {
+/** A kart as on the track: its number on a disc of its class colour; `letter` adds the class */
+export function Kart({ label, cls, size = 'md', letter, dim, onClick, className }: {
   label: number
   cls: number
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+  letter?: boolean
   dim?: boolean
-  bare?: boolean
-  size?: 'sm' | 'md' | 'lg'
+  onClick?: () => void
   className?: string
 }) {
-  return (
+  const disc = (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center justify-center gap-1 rounded-md font-semibold tnum leading-none',
-        size === 'sm' && 'h-[1.125rem] min-w-[1.125rem] px-1 text-[0.6875rem]',
-        size === 'md' && 'h-5 min-w-5 px-1.5 text-xs',
-        size === 'lg' && 'h-7 min-w-7 rounded-lg px-2 text-sm',
-        dim && 'opacity-55',
-        className,
+        'inline-flex shrink-0 items-center justify-center rounded-full font-semibold tracking-tight tnum leading-none',
+        size === 'sm' && 'size-[1.125rem] text-[0.5625rem]',
+        size === 'md' && 'size-[1.375rem] text-[0.6875rem]',
+        size === 'lg' && 'size-8 text-sm',
+        size === 'xl' && 'size-12 text-xl',
+        dim && 'opacity-50',
       )}
       style={{ background: CLASS_COLOR[cls], color: CLASS_TEXT[cls] }}
     >
       {label}
-      {!bare && <span className="font-bold opacity-60">{CLASS[cls]}</span>}
     </span>
+  )
+  const body = (
+    <>
+      {disc}
+      {letter && <span className={cn('font-medium text-muted-foreground', size === 'xl' ? 'text-base' : 'text-xs')}>{CLASS[cls]}</span>}
+    </>
+  )
+  if (!onClick) return <span className={cn('inline-flex items-center gap-1.5', className)}>{body}</span>
+  return (
+    <button
+      onClick={onClick}
+      title={`Kart ${label}, your class ${CLASS[cls]}. Click to change`}
+      className={cn('-m-1 inline-flex items-center gap-1.5 rounded-full p-1 transition-colors hover:bg-foreground/10', className)}
+    >
+      {body}
+    </button>
   )
 }

@@ -27,7 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pitLoss: 32,
   ourPace: 0,
   ourAggr: 0.5,
-  ourName: 'Мы',
+  ourName: 'You',
   gridPos: null,
   ourKartClass: null,
 }
@@ -174,8 +174,8 @@ export interface Race {
 
 // Rivals and kart numbers from the design (Figma 2MRW): surname and front number
 const RIVALS: [string, number][] = [
-  ['Куксенко', 1], ['Шик', 19], ['Жолобов', 14], ['Ребенко', 2], ['Семашко', 16],
-  ['Шепелев', 65], ['Калинин', 30], ['Иванов', 33], ['Соколик', 69],
+  ['Kuksenko', 1], ['Shik', 19], ['Zholobov', 14], ['Rebenko', 2], ['Semashko', 16],
+  ['Shepelev', 65], ['Kalinin', 30], ['Ivanov', 33], ['Sokolik', 69],
 ]
 const OUR_NUMBER = 88
 const KART_NUMBERS = [1, 6, 54, 80, 41, 3, 11, 2, 52, 12, 60, 4]
@@ -223,7 +223,7 @@ export function createRace(settings: Settings, track: Track): Race {
     return {
       id: i,
       num: isUs ? OUR_NUMBER : rivals[i - 1][1],
-      name: isUs ? settings.ourName.trim() || 'Мы' : rivals[i - 1][0],
+      name: isUs ? settings.ourName.trim() || 'You' : rivals[i - 1][0],
       isUs,
       pace: isUs ? settings.ourPace : P.fieldPaceSd * gauss(seed, K.driverPace, i),
       aggr: isUs ? settings.ourAggr : 0.1 + 0.8 * rand(seed, K.driverAggr, i),
@@ -386,7 +386,7 @@ export function step(r: Race, dt = P.dt) {
             d.overtakes++
             if (d.isUs || ahead.isUs) {
               const other = d.isUs ? ahead : d
-              log(r, d.isUs ? `Обогнали ${other.name}` : `${other.name} обогнал нас`, true,
+              log(r, d.isUs ? `You passed ${other.name}` : `${other.name} passed you`, true,
                 { kind: 'overtake', driver: other.id, ourGain: d.isUs })
             }
             continue
@@ -416,7 +416,7 @@ export function step(r: Race, dt = P.dt) {
         d.conditional = false
         const last = r.decisions.at(-1)
         if (last && last.lap === d.lapsDone) last.commit = false
-        if (d.isUs) log(r, 'Перед нами заехали — пилот остался на трассе', true)
+        if (d.isUs) log(r, 'Someone went in ahead — staying out', true)
       } else {
         enterLane(r, d, Math.floor(u1 - tr.tauPitIn) + tr.tauPitIn)
       }
@@ -479,7 +479,7 @@ function crossLine(r: Race, d: Driver, u1: number) {
   }
   if (n >= r.settings.laps) {
     r.flag = true
-    log(r, `Клетчатый флаг: ${d.name}`, false, { kind: 'flag', driver: d.id })
+    log(r, `Chequered flag: ${d.name}`, false, { kind: 'flag', driver: d.id })
     finish(r, d, tCross)
     return
   }
@@ -504,7 +504,7 @@ function enterLane(r: Race, d: Driver, u: number) {
   d.pitLapStint = r.track.pitLapToNew ? d.lapsDone : d.lapsDone + 1
   if (d.isUs) {
     r.intent = 'stay'
-    log(r, 'Мы заехали в питлейн', true, { kind: 'pit', driver: d.id })
+    log(r, 'You are in the pit lane', true, { kind: 'pit', driver: d.id })
   }
 }
 
@@ -553,7 +553,7 @@ function laneStep(r: Race) {
       from, to, wait, boxAfter: [r.box[0], r.box[1]],
     })
     const k = (id: number) => r.karts[id].label
-    log(r, `${d.name}: карт ${k(from)} → ${k(to)}${wait > 0.5 ? `, ждал ${wait.toFixed(1)} с` : ''}`, d.isUs,
+    log(r, `${d.name}: kart ${k(from)} → ${k(to)}${wait > 0.5 ? `, waited ${wait.toFixed(1)} s` : ''}`, d.isUs,
       { kind: 'kart', driver: d.id, from, to })
   }
 }

@@ -42,7 +42,7 @@ export default function App() {
 function loadName(): string | null {
   try {
     const name = localStorage.getItem('racecraft.name')
-    return name === DEFAULT_SETTINGS.ourName ? '' : name
+    return name === DEFAULT_SETTINGS.ourName || name === 'Мы' ? '' : name
   } catch {
     return null
   }
