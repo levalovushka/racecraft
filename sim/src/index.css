@@ -4,6 +4,8 @@
 @import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
+/* laptop screens (1280×720, 1366×768): the right column tightens so the orders stay on screen */
+@custom-variant short (@media (max-height: 820px));
 
 @theme inline {
     --font-heading: var(--font-sans);

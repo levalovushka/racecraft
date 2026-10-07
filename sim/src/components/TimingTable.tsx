@@ -44,10 +44,7 @@ export function TimingTable({ race, onChange }: { race: Race; onChange: () => vo
             <tr key={d.id} className={cn(isUs && 'font-semibold')} aria-current={isUs ? 'true' : undefined}>
               <td className={cn(TD, 'relative pl-3', isUs && 'before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-foreground')}>{pos}</td>
               <th scope="row" className={cn(TD, 'text-left', isUs ? 'font-semibold' : 'font-normal')}>
-                <span className="flex min-w-0 items-baseline gap-2.5">
-                  <span className="w-5 shrink-0 text-caption font-normal text-muted-foreground">{d.num}</span>
-                  <span className="truncate" title={d.name}>{d.name}</span>
-                </span>
+                <span className="block truncate" title={d.name}>{d.name}</span>
               </th>
               <td className={TD}>
                 <Kart label={race.karts[d.kart].label} cls={ourClass(race, d.kart)}

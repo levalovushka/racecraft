@@ -57,3 +57,23 @@ export function timing(r: Race): TimingRow[] {
 }
 
 export const fmtLap = (x: number | null) => (x === null ? '' : x.toFixed(2))
+
+/**
+ * Virtual position: the order once everyone has made the stops still ahead of
+ * them. Built from what live timing publishes: line crossings, lap times and
+ * the stint number (a stop counts as done once the lap it was made on is
+ * complete). Everyone is brought to the leader's lap count at their own clean
+ * pace, then each stop still to make costs the pit loss.
+ */
+export function virtualOrder(r: Race, rows: TimingRow[] = timing(r)): Map<number, number> {
+  const lead = Math.max(...rows.map((x) => x.d.lapsDone))
+  const projected = rows.map(({ d, stats }) => {
+    const pace = stats.avg ?? stats.last ?? r.track.refLap
+    const atLine = stats.cross.at(-1) ?? 0
+    const reflected = r.pits.filter((p) => p.driver === d.id && p.lap <= d.lapsDone).length
+    const toMake = Math.max(0, r.settings.pits - reflected)
+    return { id: d.id, t: atLine + (lead - d.lapsDone) * pace + toMake * r.settings.pitLoss }
+  })
+  projected.sort((a, b) => a.t - b.t)
+  return new Map(projected.map((x, i) => [x.id, i + 1]))
+}

@@ -6,7 +6,7 @@ import { inLane, raceLap, type Order, type Race, type Settings } from '@/engine/
 import { stintInfo, timeToDecision, timeToPitIn } from '@/engine/ai'
 import { useSim } from '@/sim/useSim'
 import { contenders, fmtTime, laps, ourClass, projectRejoin, setOurClass, us } from '@/sim/model'
-import { fmtLap, timing } from '@/sim/timing'
+import { fmtLap, timing, virtualOrder } from '@/sim/timing'
 import { TrackView } from './TrackView'
 import { TimingTable } from './TimingTable'
 import { Kart } from './KartBadge'
@@ -84,24 +84,13 @@ function AppBar({ race, paused, speed, onPause, onSpeed, onFinish }: {
   onFinish: () => void
 }) {
   return (
-    <header className="flex h-9 shrink-0 items-center justify-between gap-6 px-2 text-sm">
-      <div className="flex min-w-0 items-center gap-4">
-        <Wordmark />
-        <span className="truncate text-muted-foreground">Premium · seed {race.settings.seed}</span>
-      </div>
-      <div className="flex items-center gap-1">
-        {race.flag ? (
-          <Button size="lg" onClick={onFinish} className="px-3.5">Open debrief <ArrowRight /></Button>
-        ) : (
-          <>
-            <button
-              onClick={onPause}
-              aria-label={paused ? 'Play' : 'Pause'}
-              title="Space"
-              className="flex h-8 w-9 items-center justify-center rounded-md text-foreground transition-colors hover:bg-secondary"
-            >
-              {paused ? <PlayIcon /> : <PauseIcon />}
-            </button>
+    <header className="flex h-10 shrink-0 items-center justify-between gap-6 pl-2 text-sm">
+      <Wordmark />
+      {race.flag ? (
+        <Button size="lg" onClick={onFinish} className="h-10 px-4">Open debrief <ArrowRight /></Button>
+      ) : (
+        <div className="flex items-center gap-3">
+          <div className="flex" role="group" aria-label="Speed">
             {SPEEDS.map((s, i) => (
               <button
                 key={s}
@@ -109,15 +98,26 @@ function AppBar({ race, paused, speed, onPause, onSpeed, onFinish }: {
                 aria-keyshortcuts={String(i + 1)}
                 onClick={() => onSpeed(s)}
                 title={`Key ${i + 1}`}
-                className={cn('h-8 w-10 rounded-md tnum transition-colors',
+                className={cn('h-10 w-11 rounded-md tnum transition-colors',
                   speed === s ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground')}
               >
                 {s}×
               </button>
             ))}
-          </>
-        )}
-      </div>
+          </div>
+          {/* the control reached for most: large, labelled, in the corner */}
+          <button
+            onClick={onPause}
+            aria-keyshortcuts="Space"
+            title="Space"
+            className={cn('flex h-10 w-[7.5rem] items-center justify-center gap-2 rounded-lg font-semibold transition-[color,background-color,scale] duration-150 ease-out motion-safe:active:scale-[0.96]',
+              paused ? 'bg-foreground text-background' : 'bg-secondary text-foreground hover:bg-selected')}
+          >
+            {paused ? <PlayIcon /> : <PauseIcon />}
+            {paused ? 'Resume' : 'Pause'}
+          </button>
+        </div>
+      )}
     </header>
   )
 }
@@ -151,8 +151,6 @@ function YouPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void
   const rows = timing(race)
   const i = rows.findIndex((r) => r.d === me)
   const mine = rows[i]
-  const ahead = rows[i - 1]
-  const behind = rows[i + 1]
   const si = stintInfo(race, me)
   const cur = me.stints[me.stints.length - 1]
   const onKart = Math.max(0, me.lapsDone - cur.start)
@@ -175,40 +173,46 @@ function YouPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void
   else if (si.margin <= 2) { status = `Burning · ${laps(si.margin)} left`; hot = true }
   else status = `Window open · ${laps(si.margin)} left`
 
+  const virtual = virtualOrder(race, rows).get(me.id)!
+  // two drivers either side; the outer pair only where the screen is tall enough
+  const around = [-2, -1, 0, 1, 2].map((k) => ({ k, r: rows[i + k] })).filter((x) => x.r)
+
   return (
     <Panel className="shrink-0 p-4">
+      <h2 className="sr-only">You</h2>
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-sm font-medium">
-            <span className="truncate">{me.name}</span>
-            <span className="font-normal text-muted-foreground">#{me.num}</span>
-            <Kart label={race.karts[me.kart].label} cls={ourClass(race, me.kart)} onClick={() => rerate(me.kart)} />
-          </h2>
-          <div className="mt-4 grid grid-cols-3 gap-4">
-            <Figure label="Last lap" value={fmtLap(mine.stats.last) || '—'} />
-            <Figure label="Best" value={fmtLap(mine.stats.best) || '—'} />
-            <Figure label="Pace vs field" value={pace === null ? '—' : Math.abs(pace) < 0.005 ? 'even' : <>{Math.abs(pace).toFixed(2)} <span className="text-sm font-normal text-muted-foreground">{pace < 0 ? 'faster' : 'slower'}</span></>} />
+        <div>
+          <div className="text-display font-medium tnum short:text-[2.5rem]">P{mine.pos}</div>
+          <div className="mt-2 text-sm text-muted-foreground tnum short:mt-1">
+            {me.mode === 'done' || race.flag ? 'Final order' : <><span className="text-foreground">P{virtual}</span> after stops</>}
           </div>
         </div>
-        <div className="text-display font-medium tnum">P{mine.pos}</div>
+        <Kart size="lg" label={race.karts[me.kart].label} cls={ourClass(race, me.kart)} onClick={() => rerate(me.kart)} />
       </div>
 
-      {/* the drivers on either side, as a battle graphic does it */}
-      <ol className="mt-4 text-sm tnum" aria-label="Around you">
-        {[ahead, mine, behind].map((r) => r && (
-          <li key={r.d.id} className={cn('grid h-7 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2 border-t', r === mine ? 'font-semibold' : 'text-muted-foreground')}>
+      <div className="mt-5 grid grid-cols-3 gap-4 short:mt-3">
+        <Figure label="Last lap" value={fmtLap(mine.stats.last) || '—'} />
+        <Figure label="Best" value={fmtLap(mine.stats.best) || '—'} />
+        <Figure label="Pace vs field" value={pace === null ? '—' : Math.abs(pace) < 0.005 ? 'even' : <>{Math.abs(pace).toFixed(2)} <span className="text-sm font-normal text-muted-foreground">{pace < 0 ? 'faster' : 'slower'}</span></>} />
+      </div>
+
+      {/* the drivers on either side, as a broadcast battle graphic shows them */}
+      <ol className="my-5 border-b text-sm tnum short:my-3" aria-label="Around you">
+        {around.map(({ k, r }) => (
+          <li key={r.d.id} className={cn('grid h-8 short:h-7 grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 border-t',
+            Math.abs(k) === 2 && 'short:hidden',
+            k === 0 ? 'font-semibold' : 'text-muted-foreground')}>
             <span>{r.pos}</span>
-            <span className={cn('truncate', r !== mine && 'text-foreground')}>{r === mine ? 'You' : r.d.name}</span>
+            <span className={cn('truncate', k !== 0 && 'text-foreground')}>{k === 0 ? 'You' : r.d.name}</span>
             <span>
-              {r === ahead && mine.gap !== null && <><span className="text-foreground">{fmtLap(mine.gap)}</span> ahead</>}
-              {r === behind && behind.gap !== null && <><span className="text-foreground">{fmtLap(behind.gap)}</span> behind</>}
+              {k < 0 && <><span className="text-foreground">{fmtLap(gapBetween(rows, i + k, i))}</span> ahead</>}
+              {k > 0 && <><span className="text-foreground">{fmtLap(gapBetween(rows, i, i + k))}</span> behind</>}
             </span>
           </li>
         ))}
       </ol>
 
       <StintRibbon
-        className="mt-4"
         laps={s.laps}
         stints={me.stints.map((x) => ({
           from: x.start,
@@ -226,6 +230,17 @@ function YouPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void
       </div>
     </Panel>
   )
+}
+
+/** Gap at the line from row a to row b further back: the sum of the intervals between them */
+function gapBetween(rows: ReturnType<typeof timing>, a: number, b: number): number | null {
+  let g = 0
+  for (let j = a + 1; j <= b; j++) {
+    const x = rows[j].gap
+    if (x === null) return null
+    g += x
+  }
+  return g
 }
 
 const ORDERS: { value: Order; label: string; key: string }[] = [
@@ -271,7 +286,7 @@ function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) =
         </span>
       </div>
 
-      <div className="mt-3 flex items-end gap-5">
+      <div className="mt-3 flex items-end gap-5 short:mt-2">
         <div className="grid justify-items-center gap-1.5">
           <Kart size="xl" label={race.karts[first].label} cls={ourClass(race, first)} onClick={() => rerate(first)} />
           <span className="caption">Next</span>
@@ -282,7 +297,7 @@ function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) =
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 short:mt-4">
         <h3 className="caption">{locked ? `Next to take ${race.karts[first].label}` : `Before you at the entry`}</h3>
         <ul className="mt-2 grid h-[3.25rem] content-start gap-1.5 text-sm tnum">
           {before.length === 0 ? (
@@ -301,7 +316,7 @@ function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) =
         </ul>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 short:mt-3">
         <h3 className="caption">If you box now</h3>
         <div className="mt-2 flex min-h-8 items-center gap-2 text-sm tnum">
           {rejoin && !locked ? (
@@ -320,7 +335,7 @@ function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) =
         </div>
       </div>
 
-      <div className="min-h-4 flex-1" />
+      <div className="min-h-3 flex-1" />
 
       <div className="grid grid-cols-[1fr_1.3fr_1fr] gap-2" role="group" aria-label="Order to the driver">
         {ORDERS.map((o) => {
@@ -334,7 +349,7 @@ function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) =
               disabled={locked}
               onClick={() => command(o.value)}
               className={cn(
-                'h-14 rounded-lg text-base font-semibold transition-[color,background-color,scale] duration-150 ease-out disabled:opacity-30 motion-safe:enabled:active:scale-[0.96]',
+                'h-14 short:h-12 rounded-lg text-base font-semibold transition-[color,background-color,scale] duration-150 ease-out disabled:opacity-30 motion-safe:enabled:active:scale-[0.96]',
                 on ? (o.value === 'stay' ? 'bg-selected text-foreground' : 'bg-foreground text-background')
                   : 'bg-secondary text-muted-foreground hover:text-foreground',
               )}

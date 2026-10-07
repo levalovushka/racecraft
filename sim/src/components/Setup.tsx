@@ -55,7 +55,7 @@ function Ends({ left, right }: { left: string; right: string }) {
   )
 }
 
-const RULES = ['Premium', '60 laps', 'min stint 10', '2 kart changes', '25 s stop']
+const RULES = ['60 laps', 'min stint 10', '2 kart changes', '25 s stop']
 
 export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Settings) => void }) {
   const [s, setS] = useState(initial)

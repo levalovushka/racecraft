@@ -33,7 +33,7 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
       <header className="sticky top-0 z-10 bg-background/85 backdrop-blur">
         <div className="mx-auto flex min-h-14 max-w-[76rem] flex-wrap items-center gap-x-4 gap-y-2 px-6 py-2">
           <Wordmark />
-          <h1 className="caption">Debrief · seed {race.settings.seed}</h1>
+          <h1 className="text-sm text-muted-foreground">Debrief</h1>
           <div className="ml-auto flex gap-2">
             <Button variant="outline" size="lg" onClick={onAgain}><RotateCcw /> Race again</Button>
             <Button size="lg" onClick={onNew}>Start new race <ArrowRight /></Button>
