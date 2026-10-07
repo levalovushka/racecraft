@@ -22,6 +22,11 @@
     --color-chart-2: var(--chart-2);
     --color-chart-1: var(--chart-1);
     --color-ring: var(--ring);
+    --color-faint: var(--faint);
+    --color-hot: var(--hot);
+    --color-warn: var(--warn);
+    --color-ok: var(--ok);
+    --color-best: var(--best);
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
@@ -84,24 +89,29 @@
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --background: oklch(0.145 0.003 286);
+    --foreground: oklch(0.94 0 0);
+    --card: oklch(0.178 0.003 286);
+    --card-foreground: oklch(0.94 0 0);
+    --popover: oklch(0.2 0.003 286);
+    --popover-foreground: oklch(0.94 0 0);
+    --primary: oklch(0.96 0 0);
+    --primary-foreground: oklch(0.17 0 0);
+    --secondary: oklch(0.24 0.003 286);
+    --secondary-foreground: oklch(0.94 0 0);
+    --muted: oklch(0.225 0.003 286);
+    --muted-foreground: oklch(0.66 0.005 286);
+    --faint: oklch(0.5 0.005 286);
+    --accent: oklch(0.25 0.003 286);
+    --accent-foreground: oklch(0.94 0 0);
+    --destructive: oklch(0.66 0.2 22);
+    --hot: oklch(0.68 0.19 22);
+    --warn: oklch(0.8 0.15 75);
+    --ok: oklch(0.76 0.16 152);
+    --best: oklch(0.7 0.17 300);
+    --border: oklch(1 0 0 / 7%);
+    --input: oklch(1 0 0 / 11%);
+    --ring: oklch(0.6 0 0);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -120,11 +130,32 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
-  body {
-    @apply bg-background text-foreground;
-    }
+  }
+  /* One scale for every desktop: 15px up to ~1440 wide or ~970 high, 16px at
+     1920x1080, 18px at 2560x1440. Everything in the UI is in rem. */
   html {
     @apply font-sans;
-    }
+    font-size: clamp(15px, min(calc(10px + 0.3125vw), calc(6px + 0.926vh)), 19px);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  kbd {
+    font-family: inherit;
+  }
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@utility label-caps {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
 }
