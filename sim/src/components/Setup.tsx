@@ -17,15 +17,14 @@ function Segmented<T extends string | number>({ value, options, onChange, label 
   label: string
 }) {
   return (
-    <div className="grid auto-cols-fr grid-flow-col gap-0.5 rounded-lg bg-muted p-0.5" role="radiogroup" aria-label={label}>
+    <div className="grid auto-cols-fr grid-flow-col gap-0.5 rounded-lg bg-muted p-0.5" role="group" aria-label={label}>
       {options.map((o) => (
         <button
           key={String(o.value)}
-          role="radio"
-          aria-checked={value === o.value}
+          aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn('h-8 rounded-md px-2 text-sm font-medium transition-colors',
-            value === o.value ? 'bg-foreground/12 text-foreground' : 'text-muted-foreground hover:text-foreground')}
+            value === o.value ? 'bg-selected text-foreground' : 'text-muted-foreground hover:text-foreground')}
         >
           {o.label}
         </button>
@@ -34,11 +33,11 @@ function Segmented<T extends string | number>({ value, options, onChange, label 
   )
 }
 
-function Field({ label, value, children, hint }: { label: string; value?: ReactNode; children: ReactNode; hint?: ReactNode }) {
+function Field({ id, label, value, children, hint }: { id?: string; label: string; value?: ReactNode; children: ReactNode; hint?: ReactNode }) {
   return (
     <div className="grid gap-2">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium">{label}</span>
+        {id ? <label htmlFor={id} className="text-sm font-medium">{label}</label> : <span className="text-sm font-medium">{label}</span>}
         {value !== undefined && <span className="text-sm text-muted-foreground tnum">{value}</span>}
       </div>
       {children}
@@ -82,25 +81,26 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
   )
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6 py-10">
-      <div className="w-full max-w-[27rem]">
+    <main className="flex min-h-screen items-center justify-center px-6 py-10">
+      <div className="w-full max-w-[25rem]">
         <Wordmark className="text-base [&_svg]:size-5" />
-        <h1 className="mt-6 text-[2rem] leading-tight font-semibold tracking-tight">Pit manager</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Call the stops. Compare with a bot on the same seed.</p>
+        <h1 className="mt-6 text-[2rem] leading-tight font-semibold tracking-[-0.02em]">Pit manager</h1>
+        <p className="mt-2 text-sm text-pretty text-muted-foreground">Call the stops. Compare with a bot on the same seed.</p>
         <p className="mt-4 caption">{RULES.join(' · ')}</p>
 
-        <div className="mt-7 grid gap-6 rounded-2xl bg-card p-6">
-          <div className="grid gap-2">
-            <Input value={s.ourName} maxLength={24} onChange={(e) => set('ourName', e.target.value)} placeholder="Driver surname" aria-label="Driver surname" className="h-9" />
+        <div className="mt-10 grid gap-7">
+          <Field id="driver" label="Driver">
+            <Input id="driver" value={s.ourName} maxLength={24} onChange={(e) => set('ourName', e.target.value)} placeholder="Petrov" autoComplete="family-name" className="h-9" />
             {startToggle}
             {custom && (
               <div className="mt-1 grid gap-3">
-                <div className="grid gap-1.5">
-                  <span className="text-xs text-muted-foreground">Grid position</span>
+                <div className="grid gap-1.5" role="group" aria-labelledby="grid-label">
+                  <span id="grid-label" className="caption">Grid position</span>
                   <div className="grid grid-cols-10 gap-1">
                     {Array.from({ length: 10 }, (_, i) => i + 1).map((p) => (
                       <button
                         key={p}
+                        aria-pressed={s.gridPos === p}
                         onClick={() => set('gridPos', p)}
                         className={cn('h-8 rounded-md text-sm tnum transition-colors',
                           s.gridPos === p ? 'bg-foreground font-semibold text-background' : 'text-muted-foreground hover:bg-secondary hover:text-foreground')}
@@ -110,20 +110,21 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
                     ))}
                   </div>
                 </div>
-                <div className="grid gap-1.5">
-                  <span className="text-xs text-muted-foreground">Starting kart class</span>
+                <div className="grid gap-1.5" role="group" aria-labelledby="class-label">
+                  <span id="class-label" className="caption">Starting kart class</span>
                   <div className="grid grid-cols-4 gap-1">
                     {CLASS.map((c, i) => {
                       const on = s.ourKartClass === i
                       return (
                         <button
                           key={c}
+                          aria-pressed={on}
                           onClick={() => set('ourKartClass', i)}
                           className={cn('flex h-8 items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors',
                             !on && 'text-muted-foreground hover:bg-secondary hover:text-foreground')}
                           style={on ? { background: CLASS_COLOR[i], color: CLASS_TEXT[i] } : undefined}
                         >
-                          {!on && <span className="size-2 rounded-full" style={{ background: CLASS_COLOR[i] }} />}
+                          {!on && <span className="size-2 rounded-full" style={{ background: CLASS_COLOR[i] }} aria-hidden />}
                           {c}
                         </button>
                       )
@@ -132,10 +133,10 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
                 </div>
               </div>
             )}
-          </div>
+          </Field>
 
           <Field label="Pace" value={pace === 0 ? 'field average' : `${pace < 0 ? '−' : '+'}${Math.abs(pace).toFixed(2)} s/lap`}>
-            <Slider min={-0.4} max={0.4} step={0.05} value={[pace]} onValueChange={(v) => set('ourPace', Math.round(one(v) * 100) / 100)} aria-label="Driver pace" />
+            <Slider min={-0.4} max={0.4} step={0.05} value={[pace]} onValueChange={(v) => set('ourPace', Math.round(one(v) * 100) / 100)} aria-label="Pace" />
             <Ends left="faster" right="slower" />
           </Field>
 
@@ -144,20 +145,20 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
             <Ends left="sits behind" right="attacks at once" />
           </Field>
 
-          <Field label="Seed">
+          <Field id="seed" label="Seed">
             <div className="flex gap-2">
-              <Input type="number" value={s.seed} onChange={(e) => set('seed', Number(e.target.value) || 1)} aria-label="Seed" className="h-9 tnum" />
+              <Input id="seed" type="number" inputMode="numeric" value={s.seed} onChange={(e) => set('seed', Number(e.target.value) || 1)} className="h-9 tnum" />
               <Button variant="outline" className="h-9" onClick={() => set('seed', Math.floor(Math.random() * 1e6))}>
-                <Dices /> Random
+                <Dices aria-hidden /> Shuffle
               </Button>
             </div>
           </Field>
 
-          <Button className="h-11 w-full text-[0.9375rem] font-semibold" onClick={() => onStart(s)}>
+          <Button className="mt-2 h-11 w-full text-base font-semibold" onClick={() => onStart(s)}>
             Start race <ArrowRight />
           </Button>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

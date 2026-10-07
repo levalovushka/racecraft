@@ -34,7 +34,7 @@ export const SHAPE = {
 export const CLASS = ['A', 'B', 'C', 'D']
 export const CLASS_NAME = ['A — top of the field', 'B — above average', 'C — below average', 'D — tail of the field']
 export const CLASS_COLOR = ['#04b630', '#0090ff', '#e79d13', '#e5484d']
-export const CLASS_TEXT = ['#0b2212', '#0f1c2e', '#291800', '#2a1314']
+export const CLASS_TEXT = ['#0b2212', '#0f1c2e', '#291800', '#1f0c0d']
 
 export const us = (r: Race) => r.drivers[0]
 export const ourClass = (r: Race, kart: number) => classOf(us(r).perceived[kart])
@@ -98,11 +98,11 @@ export interface Status {
  */
 export function publicStatus(r: Race, d: Driver): Status {
   if (d.mode === 'done') return { label: '', tone: 'muted' }
-  if (inLane(d)) return { label: 'In pits', tone: 'muted' }
+  if (inLane(d)) return { label: 'In the pit lane', tone: 'muted' }
   if (d.pitsDone >= r.settings.pits) return { label: '', tone: 'muted' }
   const h = hunger(r, d, us(r).perceived, true)
   if (h === 'burning') return { label: 'Burning', tone: 'hot' }
-  if (h === 'locked') return { label: `Min stint −${r.settings.minStint - (d.lapsDone - d.stints[d.stints.length - 1].start)}`, tone: 'muted' }
+  if (h === 'locked') return { label: `Min stint · ${laps(r.settings.minStint - (d.lapsDone - d.stints[d.stints.length - 1].start))}`, tone: 'muted' }
   if (h === 'hungry') return { label: 'Wants a kart', tone: 'default' }
   return { label: '', tone: 'muted' }
 }
@@ -164,6 +164,10 @@ export function projectRejoin(r: Race): Rejoin | null {
   }
   return { wait, kart, queue: queue.length, ahead, behind }
 }
+
+const PLURAL = new Intl.PluralRules('en')
+/** "1 lap", "3 laps": English plural rules, not a hand-written n === 1 */
+export const laps = (n: number) => `${n} ${PLURAL.select(n) === 'one' ? 'lap' : 'laps'}`
 
 export function fmtTime(t: number): string {
   const m = Math.floor(t / 60)
