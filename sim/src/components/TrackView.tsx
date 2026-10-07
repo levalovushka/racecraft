@@ -6,6 +6,8 @@ import { CLASS_COLOR, CLASS_TEXT, driverXY, ourClass, parkedTargets, SHAPE, TRAC
 const SHIFT_TIME = 1.2 // s of race time for a parked kart to roll one slot forward
 const SLOT_STEP = TRACK.pit.slots[0] - TRACK.pit.slots[1]
 const R = 26
+// the blurred racing line ("вкат") is hidden for now: the interface went flat
+const SHOW_RESIN = false
 
 function KartDot({ x, y, label, cls, us, onClick }: { x: number; y: number; label: number; cls: number; us?: boolean; onClick?: () => void }) {
   return (
@@ -72,9 +74,11 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
       <path d={SHAPE.course} fillRule="evenodd" fill="#1B1B1B" />
       <path d={SHAPE.trackOutline} fillRule="evenodd" fill="none" stroke="white" strokeOpacity={0.16} strokeDasharray="12 6" />
       {/* "вкат": darker rubbered line, decoration only */}
-      <g mask="url(#tv-resin-mask)">
-        <path d={SHAPE.resinLine} fill="none" stroke="black" strokeOpacity={0.5} strokeWidth={64} filter="url(#tv-resin-blur)" />
-      </g>
+      {SHOW_RESIN && (
+        <g mask="url(#tv-resin-mask)">
+          <path d={SHAPE.resinLine} fill="none" stroke="black" strokeOpacity={0.5} strokeWidth={64} filter="url(#tv-resin-blur)" />
+        </g>
+      )}
       <path d={SHAPE.stroke} fillRule="evenodd" fill="none" stroke="#5A5A5A" />
       <line x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke="white" strokeDasharray="8 8" />
 
