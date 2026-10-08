@@ -309,7 +309,7 @@ function ForecastPanel({ race }: { race: Race }) {
     rows.splice(at, 0, (
       <li key="us" className="col-span-6 flex items-center gap-3 py-0.5 text-xs text-foreground tnum">
         <span className="h-px min-w-4 flex-1 bg-foreground/40" />
-        <span className="text-center text-balance">{t.yourEntry(Math.round(tIn!))}</span>
+        <span className="text-center text-balance">{t.yourEntry(Math.round(tIn!))}{at > 0 && ` ${t.goBeforeYou}`}</span>
         <span className="h-px min-w-4 flex-1 bg-foreground/40" />
       </li>
     ))
