@@ -1,10 +1,12 @@
-import { useRef } from 'react'
-import type { Race } from '@/engine/race'
-import { pitXY } from '@/engine/track'
+import { useRef, useState } from 'react'
+import { P, type Driver, type Race } from '@/engine/race'
+import { pitXY, xyOfTau } from '@/engine/track'
 import { useT } from '@/i18n'
 import { CLASS_COLOR, CLASS_TEXT, driverXY, ourClass, parkedTargets, SHAPE, TRACK } from '@/sim/model'
 
 const SHIFT_TIME = 1.2 // s of race time for a parked kart to roll one slot forward
+const GRID_SIDE = 24 // px either side of the racing line for the two grid columns
+const GRID_MERGE = 4 // s of race time for the two columns to file into one line
 const SLOT_STEP = TRACK.pit.slots[0] - TRACK.pit.slots[1]
 const R = 26
 // the blurred racing line ("вкат") is hidden for now: the interface went flat
@@ -51,14 +53,35 @@ function useParked(race: Race) {
   return targets.map(({ kart }) => ({ kart, f: next.get(kart)! }))
 }
 
+/**
+ * Staggered grid: odd slots on one side of the racing line, even on the other,
+ * merging into one line in the first seconds. The view mounts on the grid
+ * (the race waits for the start lights), so the slot is read off the start gap.
+ */
+function useGrid(race: Race) {
+  const [side] = useState(() => new Map(race.drivers.map((d) => [d.id, Math.round(-d.u / P.gridGap) % 2 ? -1 : 1])))
+  return (d: Driver, [x, y]: [number, number]): [number, number] => {
+    const k = Math.max(0, 1 - race.t / GRID_MERGE)
+    if (d.mode !== 'track' || k === 0) return [x, y]
+    const [ax, ay] = xyOfTau(TRACK, d.u + 0.002)
+    const len = Math.hypot(ax - x, ay - y) || 1
+    const off = side.get(d.id)! * GRID_SIDE * k * k
+    return [x - ((ay - y) / len) * off, y + ((ax - x) / len) * off]
+  }
+}
+
 export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number) => void }) {
   const t = useT()
   const red = race.t < race.greenAt
   const [lx1, ly1, lx2, ly2] = SHAPE.line
   const [gx, gy, gw, gh] = SHAPE.light
   const parked = useParked(race)
+  const grid = useGrid(race)
   const cars = race.drivers
-    .map((d) => ({ d, xy: driverXY(race, d) }))
+    .map((d) => {
+      const xy = driverXY(race, d)
+      return { d, xy: xy && grid(d, xy) }
+    })
     .filter((c) => c.xy)
     .sort((a, b) => Number(a.d.isUs) - Number(b.d.isUs))
 

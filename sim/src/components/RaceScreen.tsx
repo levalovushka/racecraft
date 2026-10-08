@@ -12,6 +12,7 @@ import { TrackView } from './TrackView'
 import { TimingTable } from './TimingTable'
 import { Kart } from './KartBadge'
 import { StintRibbon } from './StintRibbon'
+import { StartLights } from './StartLights'
 import { Brand, Panel } from './kit'
 
 const SPEEDS = [1, 2, 4, 8, 16]
@@ -53,6 +54,7 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
               <TrackView race={race} onKart={rerate} />
             </div>
             <Ticker race={race} />
+            <StartLights lights={sim.lights} />
           </section>
           <Panel className="shrink-0 px-1 pt-1 pb-2">
             <TimingTable race={race} onChange={sim.refresh} />

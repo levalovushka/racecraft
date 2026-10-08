@@ -57,6 +57,8 @@ const en = {
   lap: 'Lap',
   of: 'of',
   flag: 'Chequered flag',
+  startLights: 'Start lights',
+  lightsGo: 'Green, go',
 
   // you
   afterStops: 'after stops',
@@ -217,6 +219,8 @@ const ru: Dict = {
   lap: 'Круг',
   of: 'из',
   flag: 'Финиш',
+  startLights: 'Стартовые огни',
+  lightsGo: 'Зелёный, старт',
 
   afterStops: 'после питов',
   finalOrder: 'Итоговый порядок',
