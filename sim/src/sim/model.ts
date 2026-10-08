@@ -158,11 +158,12 @@ export function forecast(r: Race, limit = 8): Goer[] {
   return out
 }
 
-/** Race time when the last driver now in the lane presses the button and the lane is clear again */
+/** Earliest pit entry for "box if clear": everyone now in the lane has pressed and the light is green by the time we reach the box */
 export function laneClearAt(r: Race): number {
-  const lane = queueBefore(r, null, true)
-  if (!lane.length) return r.t
-  return Math.max(r.greenAt, r.t) + r.settings.stopTime * (lane.length - 1)
+  let green = Math.max(r.greenAt, r.t)
+  // each one presses once he is at the box and the light is green; laneIn arrives at laneT1, wait arrived at laneT0
+  for (const d of queueBefore(r, null, true)) green = Math.max(green, d.mode === 'wait' ? d.laneT0 : d.laneT1) + r.settings.stopTime
+  return green - P.toBox
 }
 
 export interface Rejoin {

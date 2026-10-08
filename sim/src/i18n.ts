@@ -61,12 +61,11 @@ const en = {
   lightsGo: 'Green, go',
 
   // you
-  afterStops: 'after stops',
+  afterStops: 'after all stops',
+  afterStopsHint: 'Your position once every driver, you included, has made their remaining stops. Each stop ≈ 32 s.',
   finalOrder: 'Final order',
   lastLap: 'Last lap',
   best: 'Best',
-  paceVsField: 'Pace vs field',
-  even: 'even',
   aroundYou: 'Around you',
   ahead: 'ahead',
   behind: 'behind',
@@ -127,12 +126,13 @@ const en = {
 
   // timing
   liveTiming: 'Live timing',
-  cols: { pos: 'Pos', driver: 'Driver', kart: 'Kart', interval: 'Interval', last: 'Last', best: 'Best', avg: 'Average', stint: 'Stint', stops: 'Stops', status: 'Status' },
-  kartHint: 'Your class rating. Click a kart to change it',
+  cols: { pos: 'Pos', driver: 'Driver', kart: 'Kart', interval: 'Interval', last: 'Last', best: 'Best', avg: 'Average', stint: 'On kart', stops: 'Stops', status: 'Status' },
+  kartHint: 'Kart colour is your class rating (A–D), not its true speed. Click a kart to change the rating — the forecast updates.',
+  stintHint: 'Laps completed on the current kart. Red — time to pit: the last lap a stop is still possible is close.',
   leader: 'Leader',
   status: { pit: 'In the pit lane', burning: 'Burning', toMin: (n: string) => `${n} to min`, hungry: 'Wants a kart' },
   kartAria: (label: number, c: string) => `Kart ${label}, class ${c}`,
-  rerate: 'Change your class rating',
+  rerate: 'Change your class rating: A→B→C→D',
   lastStopLap: (n: number) => `Last lap to start a stop: ${n}`,
 
   // events
@@ -229,12 +229,11 @@ const ru: Dict = {
   startLights: 'Стартовые огни',
   lightsGo: 'Зелёный, старт',
 
-  afterStops: 'после питов',
+  afterStops: 'после всех питов',
+  afterStopsHint: 'Ваше место, когда все гонщики, и вы тоже, сделают оставшиеся питы. Каждый пит ≈ 32 с.',
   finalOrder: 'Итоговый порядок',
   lastLap: 'Последний',
   best: 'Лучший',
-  paceVsField: 'Темп к полю',
-  even: 'ровно',
   aroundYou: 'Соседи',
   ahead: 'впереди',
   behind: 'сзади',
@@ -293,12 +292,13 @@ const ru: Dict = {
   boxClosed: 'Бокс закрыт',
 
   liveTiming: 'Тайминг',
-  cols: { pos: 'Поз.', driver: 'Пилот', kart: 'Карт', interval: 'Интервал', last: 'Последний', best: 'Лучший', avg: 'Средний', stint: 'Стинт', stops: 'Питы', status: 'Статус' },
-  kartHint: 'Ваша оценка класса. Клик по карту меняет её',
+  cols: { pos: 'Поз.', driver: 'Пилот', kart: 'Карт', interval: 'Интервал', last: 'Последний', best: 'Лучший', avg: 'Средний', stint: 'На карте', stops: 'Питы', status: 'Статус' },
+  kartHint: 'Цвет карта — ваша оценка его класса (A–D), не точная скорость. Клик по карту меняет оценку — прогноз пересчитается.',
+  stintHint: 'Сколько кругов вы проехали на текущем карте. Красным — пора в пит: скоро последний круг, когда пит ещё можно сделать.',
   leader: 'Лидер',
   status: { pit: 'В пит-лейне', burning: 'Горит', toMin: (n) => `${n} до мин.`, hungry: 'Ищет карт' },
   kartAria: (label, c) => `Карт ${label}, класс ${c}`,
-  rerate: 'Изменить вашу оценку класса',
+  rerate: 'Сменить вашу оценку класса: A→B→C→D',
   lastStopLap: (n) => `Последний круг для пита: ${n}`,
 
   raceEvents: 'События гонки',
