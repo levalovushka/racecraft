@@ -411,8 +411,8 @@ export function step(r: Race, dt = P.dt) {
     if (Math.floor(u0 - tr.tauDecision) < Math.floor(u1 - tr.tauDecision)) decide(r, d)
     if (Math.floor(u0) < Math.floor(u1)) crossLine(r, d, u1)
     if (d.mode === 'track' && d.commit && Math.floor(u0 - tr.tauPitIn) < Math.floor(u1 - tr.tauPitIn)) {
-      if (d.conditional && r.drivers.some((o) => o.mode === 'laneIn' || o.mode === 'wait')) {
-        // "box if nobody goes in ahead": somebody did, the driver stays out
+      if (d.conditional && (r.greenAt > r.t + P.toBox || r.drivers.some((o) => o.mode === 'laneIn' || o.mode === 'wait'))) {
+        // "box if clear": somebody went in ahead, or the light is still red when he reaches the box — he stays out
         d.commit = false
         d.conditional = false
         const last = r.decisions.at(-1)
