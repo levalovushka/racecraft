@@ -82,7 +82,7 @@ const en = {
 
   // box and orders
   forecast: 'Forecast',
-  forecastNote: 'Rivals about to pit: kart they hand in → kart they take.',
+  forecastNote: 'Rivals about to pit.',
   decision: 'Decision',
   takes: 'takes',
   yourEntry: (n: number) => `you reach pit entry in ${n} s`,
@@ -249,7 +249,7 @@ const ru: Dict = {
   stops: 'питы',
 
   forecast: 'Прогноз',
-  forecastNote: 'Кто из соперников скоро заедет в пит: какой карт сдаст → какой заберёт.',
+  forecastNote: 'Кто из соперников скоро заедет в пит.',
   decision: 'Решение',
   takes: 'заберёт',
   yourEntry: (n) => `вы у въезда в пит через ${n} с`,
