@@ -141,9 +141,9 @@ export function lossBreakdown(r: Race, driverId = 0) {
     karts: round1(stintViews(r, driverId).reduce((a, x) => a + x.cost, 0)),
     redWait: round1(d.redWait),
     traffic: round1(d.trafficLoss),
-    penalties: round1(penalties(r, d)),
+    penalties: round1(penalties(r, d) + (row.dsq ? 600 : 0)), // short stints and, like score(), DSQ for missed stops
   }
   const shown = Object.values(named).reduce((a, x) => a + x, 0)
-  // lap noise, passes and defending, warm-up, release from the box, laps short, DSQ
+  // lap noise, passes and defending, warm-up, release from the box; a lapped driver's missing laps at refLap
   return { ...named, other: round1(round1(real - clean) - shown) }
 }

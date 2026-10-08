@@ -150,7 +150,8 @@ const fmtS = (x: number) => `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(1)}`
 function LossTable({ rows, name }: { rows: [string, number, number][]; name: string }) {
   const t = useT()
   const max = Math.max(5, ...rows.flatMap(([, a, b]) => [Math.abs(a), Math.abs(b)]))
-  const total = rows.reduce((t, [, a, b]) => [t[0] + a, t[1] + b], [0, 0])
+  // float sums of 0.1 steps drift (−0.1 − 0.2 + 0.3 = −5.6e-17 → «−0.0»): snap back to the 0.1 grid
+  const total = rows.reduce((t, [, a, b]) => [t[0] + a, t[1] + b], [0, 0]).map((x) => Math.round(x * 10) / 10 || 0)
   const tone = (v: number) => (Math.abs(v) < 0.05 ? 'text-muted-foreground' : v < 0 ? 'text-ok' : 'text-hot')
   const Bar = ({ v, other }: { v: number; other?: boolean }) => (
     <span className={cn('flex items-center gap-2.5', other && 'opacity-70')}>
