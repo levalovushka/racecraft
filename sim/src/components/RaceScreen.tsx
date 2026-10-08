@@ -255,14 +255,14 @@ const ORDERS: { value: Order; key: string }[] = [
   { value: 'box', key: 'B' },
 ]
 
-/** Light: red with the seconds left, or green */
+/** The box light: red with the seconds the next driver waits, or green */
 function Light({ race }: { race: Race }) {
   const t = useT()
   const red = race.t < race.greenAt
   return (
-    <span className={cn('flex items-center gap-2 text-sm tnum', red ? 'text-hot' : 'text-muted-foreground')}>
+    <span className={cn('flex items-center gap-2 text-sm tnum', red ? 'text-hot' : 'text-muted-foreground')} title={t.boxLight}>
       <span className={cn('size-2 rounded-full', red ? 'bg-hot' : 'bg-ok')} aria-hidden />
-      {red ? `${t.red} · ${Math.ceil(race.greenAt - race.t)} ${t.s}` : t.green}
+      {red ? t.pitWait(Math.ceil(race.greenAt - race.t)) : t.pitOpen}
     </span>
   )
 }
@@ -291,7 +291,7 @@ function ForecastPanel({ race }: { race: Race }) {
 
   const rows: ReactNode[] = goers.map((g) => (
     <li key={g.d.id} className={cn('contents', !g.lane && g.t > soon && 'text-muted-foreground')}>
-      <span className="text-right text-muted-foreground">
+      <span className="text-right text-muted-foreground" title={t.whenHint}>
         {g.lane ? t.nowShort : g.t < soon ? `${Math.round(g.t)} ${t.s}` : t.inLaps(Math.round(g.t / soon))}
       </span>
       <Kart label={label(g.d.kart)} cls={ourClass(race, g.d.kart)} />
@@ -299,7 +299,8 @@ function ForecastPanel({ race }: { race: Race }) {
       <ArrowRight className="size-3.5 text-muted-foreground" aria-label={t.takes} />
       <Kart label={label(g.kart)} cls={ourClass(race, g.kart)} />
       {/* burning is an alarm only on this lap; further out it is just where his window ends */}
-      <span className={cn('text-right', g.burning && g.t < soon ? 'text-hot' : 'text-muted-foreground')}>
+      <span className={cn('text-right', g.burning && g.t < soon ? 'text-hot' : 'text-muted-foreground')}
+        title={g.burning ? (g.t < soon ? t.burningHint : t.deadlineHint) : g.sure ? undefined : t.maybeHint}>
         {g.burning ? (g.t < soon ? t.status.burning.toLowerCase() : t.deadline) : g.sure ? '' : t.maybe}
       </span>
     </li>
@@ -307,9 +308,9 @@ function ForecastPanel({ race }: { race: Race }) {
   if (at >= 0) {
     rows.splice(at, 0, (
       <li key="us" className="col-span-6 flex items-center gap-3 py-0.5 text-xs text-foreground tnum">
-        <span className="h-px flex-1 bg-foreground/40" />
-        {t.yourEntry} · {tIn!.toFixed(1)} {t.s}
-        <span className="h-px flex-1 bg-foreground/40" />
+        <span className="h-px min-w-4 flex-1 bg-foreground/40" />
+        <span className="text-center text-balance">{t.yourEntry(Math.round(tIn!))}</span>
+        <span className="h-px min-w-4 flex-1 bg-foreground/40" />
       </li>
     ))
   }
@@ -320,6 +321,7 @@ function ForecastPanel({ race }: { race: Race }) {
         <h2 className="text-sm font-medium">{t.forecast}</h2>
         <Light race={race} />
       </div>
+      <p className="-mt-2 text-xs text-muted-foreground">{t.forecastNote}</p>
       {goers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{race.flag ? t.boxClosed : t.noStopsLeft}</p>
       ) : (
