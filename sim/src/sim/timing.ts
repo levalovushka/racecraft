@@ -32,7 +32,7 @@ function interval(r: Race, me: Driver, stats: LapStats, ahead: Driver): number {
     return Math.max(0, me.finishTime! - ahead.finishTime!)
   }
   const pace = stats.avg ?? stats.last ?? r.track.refLap
-  return Math.max(0, (distance(ahead) - distance(me)) * pace)
+  return Math.max(0, (distance(r, ahead) - distance(r, me)) * pace)
 }
 
 export interface TimingRow {

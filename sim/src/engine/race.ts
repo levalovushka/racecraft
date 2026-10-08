@@ -606,12 +606,33 @@ export function results(r: Race): Result[] {
   return rows
 }
 
-/** Laps covered: in the pit lane the distance at entry, after the flag the laps finished with */
-export const distance = (d: Driver) => (d.mode === 'done' ? d.lapsDone : d.u)
+/**
+ * Laps covered, for display. In the pit lane the driver slides from the entry
+ * point to the exit point over the shortest possible lane time and waits there
+ * if the stop takes longer: far slower than anyone on track, so whoever passes
+ * him meanwhile does it once and stays ahead. After the flag, the laps finished with.
+ */
+export function distance(r: Race, d: Driver): number {
+  if (d.mode === 'done') return d.lapsDone
+  if (d.mode === 'track') return d.u
+  const tEnter = laneEntry(r, d)
+  const shortest = P.toBox + r.settings.stopTime + r.fromBox // the release margin only adds to it
+  const { tauPitIn, tauPitOut } = r.track
+  return Math.floor(d.u) + tauPitIn + Math.min(1, (r.t - tEnter) / shortest) * (tauPitOut - tauPitIn)
+}
 
-/** Running order: by distance covered; finishers on the same lap by who crossed first */
+/** When a driver in the pit lane entered it */
+function laneEntry(r: Race, d: Driver): number {
+  if (d.mode === 'laneIn') return d.laneT0
+  if (d.mode === 'wait') return d.laneT0 - P.toBox
+  return r.pits.filter((p) => p.driver === d.id).at(-1)!.tEnter
+}
+
+/** Running order: by distance covered; finishers on the same lap by who crossed first, the lane (first come, first out) by entry */
 export function order(r: Race): Driver[] {
-  return r.drivers.slice().sort((a, b) => distance(b) - distance(a) || (a.finishTime ?? r.t) - (b.finishTime ?? r.t))
+  const entry = (d: Driver) => (inLane(d) ? laneEntry(r, d) : 0)
+  return r.drivers.slice().sort((a, b) => distance(r, b) - distance(r, a) ||
+    (a.finishTime ?? r.t) - (b.finishTime ?? r.t) || entry(a) - entry(b))
 }
 
 export function runToEnd(r: Race, dt = P.dt) {
