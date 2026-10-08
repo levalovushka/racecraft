@@ -13,8 +13,10 @@ const R = 26
 const SHOW_RESIN = false
 
 function KartDot({ x, y, label, cls, us, onClick }: { x: number; y: number; label: number; cls: number; us?: boolean; onClick?: () => void }) {
+  const t = useT()
   return (
-    <g transform={`translate(${x} ${y})`} onClick={onClick} className={onClick ? 'cursor-pointer' : undefined}>
+    <g transform={`translate(${x} ${y})`} onClick={onClick} className={onClick ? 'cursor-pointer' : undefined} aria-label={onClick ? t.rerate : undefined}>
+      {onClick && <title>{t.rerate}</title>}
       {us && <circle r={R + 6} fill="none" stroke="white" strokeWidth={3} />}
       <circle r={R} fill={CLASS_COLOR[cls]} />
       <text

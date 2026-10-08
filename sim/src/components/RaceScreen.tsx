@@ -200,7 +200,7 @@ function YouPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-display font-medium tnum short:text-[2.5rem]">P{mine.pos}</div>
-          <div className="mt-2 text-sm text-muted-foreground tnum short:mt-1">
+          <div className="mt-2 text-sm text-muted-foreground tnum short:mt-1" title={me.mode === 'done' || race.flag ? undefined : t.afterStopsHint}>
             {me.mode === 'done' || race.flag ? t.finalOrder : <><span className="text-foreground">P{virtual}</span> {t.afterStops}</>}
           </div>
         </div>
@@ -210,7 +210,7 @@ function YouPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void
       <div className="mt-5 grid grid-cols-[auto_auto_minmax(0,1fr)] gap-x-8 short:mt-3">
         <Figure label={t.lastLap} value={fmtLap(mine.stats.last) || '—'} />
         <Figure label={t.best} value={fmtLap(mine.stats.best) || '—'} />
-        <Figure label={t.paceVsField} value={pace === null ? '—' : Math.abs(pace) < 0.005 ? t.even : <>{Math.abs(pace).toFixed(2)} <span className="text-sm font-normal text-muted-foreground">{pace < 0 ? t.faster : t.slower}</span></>} />
+        <Figure label={t.pace} value={pace === null ? '—' : Math.abs(pace) < 0.005 ? t.paceAverage : <>{Math.abs(pace).toFixed(2)} <span className="text-sm font-normal text-muted-foreground">{t.perLap} {pace < 0 ? t.faster : t.slower}</span></>} />
       </div>
 
       {/* the drivers on either side, as a broadcast battle graphic shows them */}
