@@ -109,28 +109,47 @@ export function publicStatus(r: Race, d: Driver): Status {
   return { kind: 'none' }
 }
 
+export interface Goer {
+  d: Driver
+  tEntry: number // s to the pit entry; 0 for a driver already in the lane
+  kart: number // the kart he will take
+  sure: boolean // in the lane, burning or 2+ classes up; otherwise he may stay out
+  lane: boolean
+}
+
 /**
- * Contender and backup for the kart that is first in the box, by the entry rule
- * and the MANAGER's ratings: drivers ordered by the time to the pit entry, keep
- * those who would want this kart.
+ * Who goes in within `horizon` seconds and which kart each takes, by the entry
+ * rule and the MANAGER's ratings. Applied in the order of the entry: every driver
+ * who goes in takes the next kart off the ribbon and puts his own on the end, so
+ * the next one judges a different kart. Our own driver is left out: that is the decision.
  */
-export function contenders(r: Race): { d: Driver; tEntry: number; hard: boolean }[] {
-  const kart = r.box[0]
-  const kc = ourClass(r, kart)
-  const out: { d: Driver; tEntry: number; hard: boolean }[] = []
+export function forecast(r: Race, horizon: number): Goer[] {
+  const lane = queueBefore(r, null, true)
+  const tape = ribbon(r, lane)
+  const out: Goer[] = lane.map((d, i) => ({ d, tEntry: 0, kart: tape[i], sure: true, lane: true }))
+  if (r.flag) return out
   const cand = r.drivers
-    .filter((d) => d.mode === 'track' && d.pitsDone < r.settings.pits && !r.flag)
+    .filter((d) => !d.isUs && d.mode === 'track' && d.pitsDone < r.settings.pits)
     .map((d) => ({ d, tEntry: timeToPitIn(r, d) }))
+    .filter((c) => c.tEntry < horizon)
     .sort((a, b) => a.tEntry - b.tEntry)
   for (const { d, tEntry } of cand) {
-    const si = stintInfo(r, d)
-    if (!si.eligible) continue
-    const h = hunger(r, d, us(r).perceived, true)
-    const gain = ourClass(r, d.kart) - kc
-    if (h === 'burning' || gain >= 1) out.push({ d, tEntry, hard: h === 'burning' || gain >= 2 })
-    if (out.length >= 3) break
+    if (!stintInfo(r, d).eligible) continue
+    const kart = tape[out.length]
+    const burning = hunger(r, d, us(r).perceived, true) === 'burning'
+    const gain = ourClass(r, d.kart) - ourClass(r, kart)
+    if (!burning && gain < 1) continue
+    out.push({ d, tEntry, kart, sure: burning || gain >= 2, lane: false })
+    tape.push(d.kart)
   }
   return out
+}
+
+/** Race time when the last driver now in the lane presses the button and the lane is clear again */
+export function laneClearAt(r: Race): number {
+  const lane = queueBefore(r, null, true)
+  if (!lane.length) return r.t
+  return Math.max(r.greenAt, r.t) + r.settings.stopTime * (lane.length - 1)
 }
 
 export interface Rejoin {
