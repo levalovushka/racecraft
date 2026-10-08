@@ -4,6 +4,8 @@
 @import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
+/* laptop screens (1280×720, 1366×768): the right column tightens so the orders stay on screen */
+@custom-variant short (@media (max-height: 820px));
 
 @theme inline {
     --font-heading: var(--font-sans);
@@ -22,6 +24,10 @@
     --color-chart-2: var(--chart-2);
     --color-chart-1: var(--chart-1);
     --color-ring: var(--ring);
+    --color-track: var(--track);
+    --color-selected: var(--selected);
+    --color-hot: var(--hot);
+    --color-ok: var(--ok);
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
@@ -46,6 +52,22 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+    /* a panel is concentric with the controls inside it: control radius + panel padding (1rem) */
+    --radius-panel: calc(var(--radius) + 1rem);
+
+    /* type scale by role */
+    --text-caption: 0.75rem;
+    --text-caption--line-height: 1rem;
+    --text-data: 0.8125rem;
+    --text-data--line-height: 1.25rem;
+    --text-figure: 1.125rem;
+    --text-figure--line-height: 1.5rem;
+    --text-display: 3.25rem;
+    --text-display--line-height: 1;
+    --text-display--letter-spacing: -0.02em;
+    --text-hero: 4rem;
+    --text-hero--line-height: 1;
+    --text-hero--letter-spacing: -0.02em;
 }
 
 :root {
@@ -83,25 +105,33 @@
     --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* Two surfaces (page, panel), two text tones (white, grey), disabled by opacity,
+   white for "you" and actions, red only for alarm. Colour otherwise belongs to kart classes. */
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --background: oklch(0 0 0);
+    --foreground: oklch(0.97 0 0);
+    --card: oklch(0.175 0 0);
+    --card-foreground: oklch(0.97 0 0);
+    --popover: oklch(0.21 0 0);
+    --popover-foreground: oklch(0.97 0 0);
+    --primary: oklch(0.97 0 0);
+    --primary-foreground: oklch(0 0 0);
+    --secondary: oklch(0.24 0 0);
+    --secondary-foreground: oklch(0.97 0 0);
+    --muted: oklch(0.24 0 0);
+    --muted-foreground: oklch(0.64 0 0);
+    /* empty part of a progress bar, ribbon or meter */
+    --track: oklch(0.3 0 0);
+    /* a chosen option that is not the primary action */
+    --selected: oklch(0.36 0 0);
+    --accent: oklch(0.24 0 0);
+    --accent-foreground: oklch(0.97 0 0);
+    --destructive: oklch(0.66 0.2 25);
+    --hot: oklch(0.68 0.2 25);
+    --ok: oklch(0.76 0.16 152);
+    --border: oklch(1 0 0 / 8%);
+    --input: oklch(1 0 0 / 10%);
+    --ring: oklch(0.8 0 0);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -119,12 +149,31 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
-    }
-  body {
-    @apply bg-background text-foreground;
-    }
+    @apply border-border outline-ring;
+  }
+  /* One scale for every desktop: 15px up to ~1440 wide or ~970 high, 16px at
+     1920x1080, 18px at 2560x1440. Everything in the UI is in rem. */
   html {
     @apply font-sans;
-    }
+    font-size: clamp(15px, min(calc(10px + 0.3125vw), calc(6px + 0.926vh)), 19px);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  :focus-visible {
+    outline-width: 2px;
+    outline-style: solid;
+    outline-offset: 2px;
+  }
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@utility caption {
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  color: var(--muted-foreground);
 }

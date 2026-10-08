@@ -32,8 +32,9 @@ export const SHAPE = {
 
 /** Class colours and the dark label colour that goes on each */
 export const CLASS = ['A', 'B', 'C', 'D']
+export const CLASS_NAME = ['A — top of the field', 'B — above average', 'C — below average', 'D — tail of the field']
 export const CLASS_COLOR = ['#04b630', '#0090ff', '#e79d13', '#e5484d']
-export const CLASS_TEXT = ['#0b2212', '#0f1c2e', '#291800', '#2a1314']
+export const CLASS_TEXT = ['#0b2212', '#0f1c2e', '#291800', '#1f0c0d']
 
 export const us = (r: Race) => r.drivers[0]
 export const ourClass = (r: Race, kart: number) => classOf(us(r).perceived[kart])
@@ -86,24 +87,26 @@ export function timingOrder(r: Race): Driver[] {
     b.lapsDone - a.lapsDone || cross.get(a.id)! - cross.get(b.id)! || b.u - a.u)
 }
 
-export interface Status {
-  label: string
-  tone: 'default' | 'muted' | 'hot'
-}
+export type Status =
+  | { kind: 'none' }
+  | { kind: 'pit' }
+  | { kind: 'burning' }
+  | { kind: 'toMin'; laps: number }
+  | { kind: 'hungry' }
 
 /**
  * What the manager can tell about a rival from public data only: stint, laps,
  * the box and his own kart ratings. Rivals' intentions are never shown.
  */
 export function publicStatus(r: Race, d: Driver): Status {
-  if (d.mode === 'done') return { label: '', tone: 'muted' }
-  if (inLane(d)) return { label: 'В питлейне', tone: 'muted' }
-  if (d.pitsDone >= r.settings.pits) return { label: '', tone: 'muted' }
+  if (d.mode === 'done') return { kind: 'none' }
+  if (inLane(d)) return { kind: 'pit' }
+  if (d.pitsDone >= r.settings.pits) return { kind: 'none' }
   const h = hunger(r, d, us(r).perceived, true)
-  if (h === 'burning') return { label: 'Горит', tone: 'hot' }
-  if (h === 'locked') return { label: `Ещё ${r.settings.minStint - (d.lapsDone - d.stints[d.stints.length - 1].start)} кр`, tone: 'muted' }
-  if (h === 'hungry') return { label: 'Ищет бокс', tone: 'default' }
-  return { label: '', tone: 'muted' }
+  if (h === 'burning') return { kind: 'burning' }
+  if (h === 'locked') return { kind: 'toMin', laps: r.settings.minStint - (d.lapsDone - d.stints[d.stints.length - 1].start) }
+  if (h === 'hungry') return { kind: 'hungry' }
+  return { kind: 'none' }
 }
 
 /**
@@ -139,10 +142,11 @@ export interface Rejoin {
 }
 
 /** If we commit now: which kart, how long under red, and who we come out next to */
-export function projectRejoin(r: Race): Rejoin | null {
+export function projectRejoin(r: Race, extra: Driver[] = []): Rejoin | null {
   const me = us(r)
   if (me.mode !== 'track' || me.pitsDone >= r.settings.pits) return null
-  const queue = queueBefore(r, me, true)
+  // extra: rivals assumed to go in ahead of us, on top of those already in the lane
+  const queue = [...queueBefore(r, me, true), ...extra]
   const kart = ribbon(r, queue)[queue.length]
   const wait = expectedWait(r, me, queue)
   const tIn = timeToPitIn(r, me)

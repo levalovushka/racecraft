@@ -1,11 +1,14 @@
 import { useRef } from 'react'
 import type { Race } from '@/engine/race'
 import { pitXY } from '@/engine/track'
+import { useT } from '@/i18n'
 import { CLASS_COLOR, CLASS_TEXT, driverXY, ourClass, parkedTargets, SHAPE, TRACK } from '@/sim/model'
 
 const SHIFT_TIME = 1.2 // s of race time for a parked kart to roll one slot forward
 const SLOT_STEP = TRACK.pit.slots[0] - TRACK.pit.slots[1]
 const R = 26
+// the blurred racing line ("вкат") is hidden for now: the interface went flat
+const SHOW_RESIN = false
 
 function KartDot({ x, y, label, cls, us, onClick }: { x: number; y: number; label: number; cls: number; us?: boolean; onClick?: () => void }) {
   return (
@@ -49,6 +52,7 @@ function useParked(race: Race) {
 }
 
 export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number) => void }) {
+  const t = useT()
   const red = race.t < race.greenAt
   const [lx1, ly1, lx2, ly2] = SHAPE.line
   const [gx, gy, gw, gh] = SHAPE.light
@@ -59,7 +63,7 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
     .sort((a, b) => Number(a.d.isUs) - Number(b.d.isUs))
 
   return (
-    <svg viewBox={SHAPE.viewBox} className="h-full w-full select-none" role="img" aria-label="Схема трассы">
+    <svg viewBox={SHAPE.viewBox} className="h-full w-full select-none" role="img" aria-label={t.track}>
       <defs>
         <mask id="tv-resin-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1578" height="1578" style={{ maskType: 'alpha' }}>
           <path d={SHAPE.resinMask} fillRule="evenodd" fill="#191919" />
@@ -70,12 +74,14 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
       </defs>
 
       <path d={SHAPE.course} fillRule="evenodd" fill="#1B1B1B" />
-      <path d={SHAPE.trackOutline} fillRule="evenodd" fill="none" stroke="white" strokeOpacity={0.3} strokeDasharray="12 6" />
+      <path d={SHAPE.trackOutline} fillRule="evenodd" fill="none" stroke="white" strokeOpacity={0.16} strokeDasharray="12 6" />
       {/* "вкат": darker rubbered line, decoration only */}
-      <g mask="url(#tv-resin-mask)">
-        <path d={SHAPE.resinLine} fill="none" stroke="black" strokeOpacity={0.5} strokeWidth={64} filter="url(#tv-resin-blur)" />
-      </g>
-      <path d={SHAPE.stroke} fillRule="evenodd" fill="none" stroke="#8C8C8C" />
+      {SHOW_RESIN && (
+        <g mask="url(#tv-resin-mask)">
+          <path d={SHAPE.resinLine} fill="none" stroke="black" strokeOpacity={0.5} strokeWidth={64} filter="url(#tv-resin-blur)" />
+        </g>
+      )}
+      <path d={SHAPE.stroke} fillRule="evenodd" fill="none" stroke="#5A5A5A" />
       <line x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke="white" strokeDasharray="8 8" />
 
       {/* traffic light: timer only while red */}
@@ -101,3 +107,4 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
     </svg>
   )
 }
+

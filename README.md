@@ -9,6 +9,7 @@
 - [docs/CONSTRAINTS.md](docs/CONSTRAINTS.md) — технические ограничения: связь, задержка тайминга, номера транспондера и шасси.
 - [docs/SIMULATOR.md](docs/SIMULATOR.md) — симулятор менеджера: спецификация.
 - [docs/GLOSSARY.md](docs/GLOSSARY.md) — словарь.
+- [docs/UX.md](docs/UX.md) — интерфейс симулятора: юзерфлоу и решения.
 
 ## Источник данных: timing.batyrshin.name
 - `/tracks/<track>/heats/<id>` — заезд: круги по пилотам (класс `pitstop-cell` = круг пита), стинты (S1..S3: карт, круги, best/avg, warm-up loss) и **Pit stops history**: круг, время гонки, пилот, карт `из → в`, карты в питлейне после пита (правый = следующий к выдаче).

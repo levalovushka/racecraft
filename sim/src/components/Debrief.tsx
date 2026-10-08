@@ -1,256 +1,330 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowRight, Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { classOf, results, type Order, type Race } from '@/engine/race'
 import {
   interestingDecisions, lossBreakdown, runBot, score, stintViews,
   type DecisionValue, type DecisionView, type StintView,
 } from '@/engine/analysis'
-import { CLASS, fmtTime, TRACK } from '@/sim/model'
-import { KartBadge } from './KartBadge'
+import { CLASS, CLASS_COLOR, fmtTime, TRACK } from '@/sim/model'
+import { driverName, useT, type Dict } from '@/i18n'
+import { Kart } from './KartBadge'
+import { StintRibbon } from './StintRibbon'
+import { Brand, Panel } from './kit'
+
+const TH = 'h-8 px-3 text-left align-middle font-normal caption'
+const TD = 'h-11 border-t px-3 align-middle'
 
 export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => void; onNew: () => void }) {
+  const t = useT()
   const ours = results(race).find((x) => x.driver.isUs)!
   const bot = useMemo(() => runBot(race.settings, TRACK, race.drivers[0].perceived), [race])
+  const botRow = results(bot.race).find((x) => x.driver.isUs)!
   const ourScore = score({ total: ours.total, pos: ours.pos, laps: ours.laps, dsq: ours.dsq }, race)
   const botScore = score(bot.outcome, bot.race)
-  const delta = botScore - ourScore
+  const delta = botScore - ourScore // > 0: we beat the bot
   const decisions = useMemo(() => interestingDecisions(race), [race])
   const ourLoss = lossBreakdown(race)
   const botLoss = lossBreakdown(bot.race)
+  const name = driverName(t, race.drivers[0])
+  const even = Math.abs(delta) < 0.5
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 p-6">
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold">Разбор гонки</h1>
-        <span className="font-mono text-sm text-muted-foreground">раздача {race.settings.seed}</span>
-        <div className="ml-auto flex gap-2">
-          <Button variant="outline" onClick={onAgain}>Ещё раз эту раздачу</Button>
-          <Button onClick={onNew}>Новая гонка</Button>
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-10 bg-background/85 backdrop-blur">
+        <div className="mx-auto flex min-h-14 max-w-[76rem] flex-wrap items-center gap-x-4 gap-y-2 px-6 py-2">
+          <Brand />
+          <h1 className="text-sm text-muted-foreground">{t.debrief}</h1>
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" size="lg" onClick={onAgain}><RotateCcw /> {t.raceAgain}</Button>
+            <Button size="lg" onClick={onNew}>{t.startNewRace} <ArrowRight /></Button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardHeader>
-            <CardDescription>{race.drivers[0].name}</CardDescription>
-            <CardTitle className="text-3xl">{ours.dsq ? 'DSQ' : `P${ours.pos}`}</CardTitle>
-          </CardHeader>
-          <CardContent className="font-mono text-sm tabular-nums text-muted-foreground">
-            {ours.laps} кр · {fmtTime(ours.time)}{ours.penalty > 0 && <span className="text-rose-500"> +{ours.penalty} с штраф</span>}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>Бот на той же раздаче</CardDescription>
-            <CardTitle className="text-3xl">{bot.outcome.dsq ? 'DSQ' : `P${bot.outcome.pos}`}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Тот же старт, правило входа с вашими классами картов, под красный не встаёт.
-          </CardContent>
-        </Card>
-        <Card className={cn(delta >= 0 ? 'ring-emerald-500/40' : 'ring-rose-500/40')}>
-          <CardHeader>
-            <CardDescription>Против бота</CardDescription>
-            <CardTitle className={cn('text-3xl tabular-nums', delta >= 0 ? 'text-emerald-500' : 'text-rose-500')}>
-              {delta >= 0 ? '+' : '−'}{Math.abs(delta).toFixed(1)} с
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {delta >= 0 ? 'Вы обыграли бота' : 'Бот проехал эту раздачу лучше'}. Лотерея картов одинаковая — разница от решений.
-          </CardContent>
-        </Card>
-      </div>
+      <main className="mx-auto flex max-w-[76rem] flex-col gap-3 px-6 pt-4 pb-8">
+        {/* verdict first */}
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+          <Panel className="p-7">
+            <h2 className="caption">{t.againstBot}</h2>
+            <div className={cn('mt-3 text-hero font-semibold tnum', even ? 'text-foreground' : delta > 0 ? 'text-ok' : 'text-hot')}>
+              {even ? '±0' : fmtS(delta)}
+              <span className="ml-2 text-2xl font-medium text-muted-foreground">{t.s}</span>
+            </div>
+            <p className="mt-4 max-w-[30rem] text-sm text-pretty text-muted-foreground">
+              {even ? t.level : delta > 0 ? t.beat : t.worse}{' '}{t.sameKarts}
+            </p>
+          </Panel>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <Result who={name} pos={ours.pos} dsq={ours.dsq} laps={ours.laps} time={ours.time} penalty={ours.penalty} strong />
+            <Result who={t.bot} pos={bot.outcome.pos} dsq={bot.outcome.dsq} laps={bot.outcome.laps} time={botRow.time} penalty={botRow.penalty} />
+          </div>
+        </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Card size="sm">
-          <CardHeader><CardTitle>Куда ушло время</CardTitle></CardHeader>
-          <CardContent>
-            <Table className="text-sm">
-              <TableHeader>
-                <TableRow><TableHead /><TableHead className="text-right">Мы</TableHead><TableHead className="text-right">Бот</TableHead></TableRow>
-              </TableHeader>
-              <TableBody>
-                {[
-                  ['Карты против среднего', ourLoss.karts, botLoss.karts],
-                  ['Ожидание под красным', ourLoss.redWait, botLoss.redWait],
-                  ['Трафик', ourLoss.traffic, botLoss.traffic],
-                  ['Штрафы', ourLoss.penalties, botLoss.penalties],
-                ].map(([k, a, b]) => (
-                  <TableRow key={k as string}>
-                    <TableCell>{k}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{fmtS(a as number)}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{fmtS(b as number)}</TableCell>
-                  </TableRow>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+          <Panel className="p-5">
+            <h2 className="text-sm font-medium">{t.whereTime}</h2>
+            <LossTable rows={[
+              [t.loss.karts, ourLoss.karts, botLoss.karts],
+              [t.loss.red, ourLoss.redWait, botLoss.redWait],
+              [t.loss.traffic, ourLoss.traffic, botLoss.traffic],
+              [t.loss.penalties, ourLoss.penalties, botLoss.penalties],
+            ]} name={name} />
+          </Panel>
+          <Panel className="p-5">
+            <div className="flex items-baseline justify-between gap-4">
+              <h2 className="text-sm font-medium">{t.stints}</h2>
+              <span className="caption">{t.trueClasses}</span>
+            </div>
+            <div className="mt-4 grid gap-6">
+              <StintsRow title={name} rows={stintViews(race)} laps={race.settings.laps} />
+              <StintsRow title={t.bot} rows={stintViews(bot.race)} laps={race.settings.laps} />
+            </div>
+          </Panel>
+        </div>
+
+        <DecisionsPanel decisions={decisions} race={race} />
+
+        <Panel className="p-5">
+          <h2 className="text-sm font-medium">{t.classification}</h2>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[36rem] text-sm tnum">
+              <thead>
+                <tr>
+                  <th scope="col" className={cn(TH, 'w-16')}>{t.resultCols.pos}</th>
+                  <th scope="col" className={TH}>{t.resultCols.driver}</th>
+                  <th scope="col" className={cn(TH, 'w-20 text-right')}>{t.resultCols.laps}</th>
+                  <th scope="col" className={cn(TH, 'w-24 text-right')}>{t.resultCols.time}</th>
+                  <th scope="col" className={cn(TH, 'w-24 text-right')}>{t.resultCols.penalty}</th>
+                  <th scope="col" className={cn(TH, 'pl-6')}>{t.resultCols.karts}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results(race).map((x) => (
+                  <tr key={x.driver.id} className={cn(x.driver.isUs && 'font-semibold')} aria-current={x.driver.isUs ? 'true' : undefined}>
+                    <td className={cn(TD, 'relative', x.driver.isUs && 'before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-foreground')}>{x.dsq ? 'DSQ' : x.pos}</td>
+                    <th scope="row" className={cn(TD, 'text-left', x.driver.isUs ? 'font-semibold' : 'font-normal')}>{driverName(t, x.driver)}</th>
+                    <td className={cn(TD, 'text-right')}>{x.laps}</td>
+                    <td className={cn(TD, 'text-right')}>{fmtTime(x.time)}</td>
+                    <td className={cn(TD, 'text-right', x.penalty > 0 && 'text-hot')}>{x.penalty ? `+${x.penalty} ${t.s}` : ''}</td>
+                    <td className={cn(TD, 'pl-6')}>
+                      <span className="flex gap-3">
+                        {stintViews(race, x.driver.id).map((s, i) => <Kart key={i} label={s.label} cls={s.trueClass} />)}
+                      </span>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-        <Card size="sm">
-          <CardHeader><CardTitle>Стинты</CardTitle><CardDescription>Истинный класс открыт после гонки</CardDescription></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <Stints title={race.drivers[0].name} rows={stintViews(race)} />
-            <Stints title="Бот" rows={stintViews(bot.race)} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <DecisionsCard decisions={decisions} race={race} />
-
-      <Card size="sm">
-        <CardHeader><CardTitle>Итоговый протокол</CardTitle></CardHeader>
-        <CardContent>
-          <Table className="text-sm">
-            <TableHeader>
-              <TableRow>
-                <TableHead>P</TableHead><TableHead>Пилот</TableHead>
-                <TableHead className="text-right">Круги</TableHead><TableHead className="text-right">Время</TableHead>
-                <TableHead className="text-right">Штраф</TableHead><TableHead>Карты</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {results(race).map((x) => (
-                <TableRow key={x.driver.id} className={cn(x.driver.isUs && 'bg-primary/10 font-semibold')}>
-                  <TableCell>{x.dsq ? 'DSQ' : x.pos}</TableCell>
-                  <TableCell>{x.driver.name}</TableCell>
-                  <TableCell className="text-right tabular-nums">{x.laps}</TableCell>
-                  <TableCell className="text-right font-mono tabular-nums">{fmtTime(x.time)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{x.penalty || ''}</TableCell>
-                  <TableCell className="flex gap-1">
-                    {stintViews(race, x.driver.id).map((s, i) => <KartBadge key={i} label={s.label} cls={s.trueClass} />)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      </main>
     </div>
   )
 }
 
-function fmtS(x: number) {
-  return `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(1)} с`
-}
-
-function Stints({ title, rows }: { title: string; rows: StintView[] }) {
+function Result({ who, pos, dsq, laps: n, time, penalty, strong }: {
+  who: string; pos: number; dsq: boolean; laps: number; time: number; penalty: number; strong?: boolean
+}) {
+  const t = useT()
   return (
-    <div className="space-y-1 text-sm">
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{title}</div>
-      {rows.map((s, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <KartBadge label={s.label} cls={s.trueClass} />
-          <span className="text-xs text-muted-foreground">вы: {CLASS[s.ourClass]}</span>
-          <span className="ml-auto font-mono text-xs tabular-nums">{s.laps} кр · {fmtS(s.cost)}</span>
+    <Panel className="flex items-center justify-between gap-4 px-7 py-5">
+      <div className="min-w-0">
+        <h2 className={cn('truncate text-sm', strong ? 'font-medium' : 'text-muted-foreground')}>{who}</h2>
+        <div className="mt-1 caption tnum">
+          {t.laps(n)} · {fmtTime(time)}
+          {penalty > 0 && <span className="text-hot"> · {t.penaltyNote(penalty)}</span>}
         </div>
-      ))}
+      </div>
+      <div className={cn('text-4xl font-semibold tracking-[-0.02em] tnum', !strong && 'text-muted-foreground')}>{dsq ? 'DSQ' : `P${pos}`}</div>
+    </Panel>
+  )
+}
+
+const fmtS = (x: number) => `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(1)}`
+
+function LossTable({ rows, name }: { rows: [string, number, number][]; name: string }) {
+  const t = useT()
+  const max = Math.max(5, ...rows.flatMap(([, a, b]) => [Math.abs(a), Math.abs(b)]))
+  const total = rows.reduce((t, [, a, b]) => [t[0] + a, t[1] + b], [0, 0])
+  const Bar = ({ v, other }: { v: number; other?: boolean }) => (
+    <span className="flex items-center gap-2.5">
+      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-track" aria-hidden>
+        <span className={cn('block h-full rounded-full', other ? 'bg-muted-foreground' : 'bg-foreground')} style={{ width: `${(Math.abs(v) / max) * 100}%` }} />
+      </span>
+      <span className={cn('w-14 text-right', other && 'text-muted-foreground')}>{fmtS(v)}</span>
+    </span>
+  )
+  return (
+    <table className="mt-3 w-full table-fixed text-data tnum">
+      <thead>
+        <tr>
+          <td className="w-24" />
+          <th scope="col" className="h-8 pr-5 text-left font-normal caption">{name}</th>
+          <th scope="col" className="h-8 text-left font-normal caption">{t.bot}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(([k, a, b]) => (
+          <tr key={k}>
+            <th scope="row" className="h-9 border-t text-left font-normal text-muted-foreground">{k}</th>
+            <td className="border-t pr-5"><Bar v={a} /></td>
+            <td className="border-t"><Bar v={b} other /></td>
+          </tr>
+        ))}
+        <tr className="font-medium">
+          <th scope="row" className="h-10 border-t text-left font-medium">{t.total}</th>
+          <td className="border-t pr-5 text-right">{fmtS(total[0])} {t.s}</td>
+          <td className="border-t text-right text-muted-foreground">{fmtS(total[1])} {t.s}</td>
+        </tr>
+      </tbody>
+    </table>
+  )
+}
+
+function StintsRow({ title, rows, laps: total }: { title: string; rows: StintView[]; laps: number }) {
+  const t = useT()
+  const ribbon = rows.map((s, i) => {
+    const from = rows.slice(0, i).reduce((a, x) => a + x.laps, 0)
+    return { from, to: from + s.laps, cls: s.trueClass, label: s.label }
+  })
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between gap-4 text-sm">
+        <h3 className="font-medium">{title}</h3>
+        <span className="caption tnum">{t.kartsCost} {fmtS(rows.reduce((a, s) => a + s.cost, 0))} {t.s}</span>
+      </div>
+      <StintRibbon laps={total} stints={ribbon} />
+      <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+        {rows.map((s, i) => (
+          <li key={i} className="flex items-center gap-2 text-xs">
+            <Kart label={s.label} cls={s.trueClass} />
+            <span className="text-muted-foreground tnum">
+              {t.laps(s.laps)}{s.ourClass !== s.trueClass && (
+                <> · {t.youRatedIt} <span className="ml-0.5 inline-block size-2 rounded-full align-middle" style={{ background: CLASS_COLOR[s.ourClass] }} role="img" aria-label={t.classN(CLASS[s.ourClass])} /></>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
 
-const KIND: Record<DecisionView['kind'], string> = { pit: 'Заехали', hungry: 'Был апгрейд', burning: 'Горели' }
 
-function DecisionsCard({ decisions, race }: { decisions: DecisionView[]; race: Race }) {
-  const [values, setValues] = useState<Record<number, DecisionValue | 'busy'>>({})
-  const worker = useRef<Worker | null>(null)
+/** Every decision is evaluated in the background as soon as the debrief opens */
+function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; race: Race }) {
+  const t = useT()
+  // a run of laps with the same situation and the same call is one decision: show and evaluate its first lap
+  const { decisions, until } = useMemo(() => {
+    const out: DecisionView[] = []
+    const until = new Map<number, number>()
+    for (const v of all) {
+      const prev = out.at(-1)
+      const last = prev && (until.get(prev.index) ?? prev.dec.lap)
+      if (prev && v.kind !== 'pit' && v.kind === prev.kind && v.dec.order === prev.dec.order && v.offered === prev.offered && v.dec.lap === last! + 1) {
+        until.set(prev.index, v.dec.lap)
+      } else out.push(v)
+    }
+    return { decisions: out, until }
+  }, [all])
+  const [values, setValues] = useState<Record<number, DecisionValue>>({})
   useEffect(() => {
+    if (decisions.length === 0) return
     const w = new Worker(new URL('../sim/evalWorker.ts', import.meta.url), { type: 'module' })
     w.onmessage = (e: MessageEvent<{ id: number; value: DecisionValue }>) => {
       setValues((v) => ({ ...v, [e.data.id]: e.data.value }))
     }
-    worker.current = w
+    for (const v of decisions) w.postMessage({ id: v.index, dec: v.dec, n: 24 })
     return () => w.terminate()
-  }, [])
-  const evaluate = (v: DecisionView) => {
-    setValues((x) => ({ ...x, [v.index]: 'busy' }))
-    worker.current?.postMessage({ id: v.index, dec: v.dec, n: 24 })
-  }
-  const evaluateAll = () => decisions.forEach((v) => !values[v.index] && evaluate(v))
+  }, [decisions])
+  const done = decisions.filter((v) => values[v.index]).length
 
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>Решения</CardTitle>
-        <CardDescription>
-          Моменты, когда вы заехали, когда в боксе был карт лучше вашего или когда вы горели. Оценка — 24 продолжения гонки из этой точки с «боксом» и с «остаёмся»; дальше за нас едет бот.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {decisions.length === 0 ? (
-          <div className="text-sm text-muted-foreground">Нечего разбирать.</div>
-        ) : (
-          <>
-            <div className="mb-2 flex justify-end">
-              <Button size="sm" variant="outline" onClick={evaluateAll}>Оценить все</Button>
-            </div>
-            <Table className="text-sm">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Круг</TableHead><TableHead>Ситуация</TableHead><TableHead>Наш карт</TableHead><TableHead>Получили бы</TableHead>
-                  <TableHead className="text-right">Ожидание</TableHead><TableHead className="text-right">Запас</TableHead>
-                  <TableHead>Решение</TableHead><TableHead className="text-right">Бокс</TableHead><TableHead className="text-right">Остаёмся</TableHead><TableHead>Вывод</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {decisions.map((v) => {
-                  const val = values[v.index]
-                  const s = v.dec.snapshot
-                  const ourCls = (k: number) => classOf(s.drivers[0].perceived[k])
-                  return (
-                    <TableRow key={v.index}>
-                      <TableCell className="tabular-nums">{v.dec.lap}</TableCell>
-                      <TableCell>{KIND[v.kind]}</TableCell>
-                      <TableCell><KartBadge label={race.karts[v.ourKart].label} cls={ourCls(v.ourKart)} /></TableCell>
-                      <TableCell><KartBadge label={race.karts[v.offered].label} cls={ourCls(v.offered)} /></TableCell>
-                      <TableCell className="text-right font-mono tabular-nums">{v.wait > 0.5 ? `${v.wait.toFixed(0)} с` : '—'}</TableCell>
-                      <TableCell className="text-right tabular-nums">{v.margin} кр</TableCell>
-                      <TableCell className="font-semibold">{orderText(v.dec.order, v.dec.commit)}</TableCell>
-                      {val && val !== 'busy' ? (
-                        <>
-                          <TableCell className="text-right font-mono tabular-nums">{val.pit.mean.toFixed(1)}</TableCell>
-                          <TableCell className="text-right font-mono tabular-nums">{val.stay.mean.toFixed(1)}</TableCell>
-                          <TableCell><Verdict val={val} commit={v.dec.commit} /></TableCell>
-                        </>
-                      ) : (
-                        <TableCell colSpan={3} className="text-right">
-                          {val === 'busy' ? (
-                            <Loader2 className="ml-auto size-4 animate-spin" />
-                          ) : (
-                            <Button size="xs" variant="outline" onClick={() => evaluate(v)}>Оценить</Button>
-                          )}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </>
-        )}
-      </CardContent>
-    </Card>
+    <Panel className="p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="text-sm font-medium">{t.calls}</h2>
+        <span className="caption" role="status">
+          {done < decisions.length
+            ? <span className="flex items-center gap-1.5"><Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden /> {t.evaluating(done, decisions.length)}</span>
+            : t.callsNote}
+        </span>
+      </div>
+      {decisions.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">{t.nothingToReview}</p>
+      ) : (
+        <div className="mt-3">
+          <table className="w-full text-sm tnum">
+            <thead>
+              <tr>
+                <th scope="col" className={TH}>{t.callCols.lap}</th>
+                <th scope="col" className={TH}>{t.callCols.situation}</th>
+                <th scope="col" className={TH}>{t.callCols.kart}</th>
+                <th scope="col" className={cn(TH, 'text-right')}>{t.callCols.red}</th>
+                <th scope="col" className={cn(TH, 'text-right')}>{t.callCols.margin}</th>
+                <th scope="col" className={cn(TH, 'pl-6')}>{t.callCols.call}</th>
+                <th scope="col" className={TH}>{t.callCols.verdict}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {decisions.map((v) => {
+                const val = values[v.index]
+                const ourCls = (k: number) => classOf(v.dec.snapshot.drivers[0].perceived[k])
+                return (
+                  <tr key={v.index}>
+                    <th scope="row" className={cn(TD, 'text-left font-normal whitespace-nowrap')}>
+                      {v.dec.lap}{until.has(v.index) && <span className="text-muted-foreground">–{until.get(v.index)}</span>}
+                    </th>
+                    <td className={cn(TD, 'text-muted-foreground')}>{t.kind[v.kind]}</td>
+                    <td className={cn(TD, 'whitespace-nowrap')}>
+                      <span className="flex items-center gap-2">
+                        <Kart label={race.karts[v.ourKart].label} cls={ourCls(v.ourKart)} />
+                        <ArrowRight className="size-3 text-muted-foreground" aria-label={t.to} />
+                        <Kart label={race.karts[v.offered].label} cls={ourCls(v.offered)} />
+                      </span>
+                    </td>
+                    <td className={cn(TD, 'text-right whitespace-nowrap', v.wait > 0.5 ? 'text-hot' : 'text-muted-foreground')}>{v.wait > 0.5 ? `${v.wait.toFixed(0)} ${t.s}` : '—'}</td>
+                    <td className={cn(TD, 'text-right whitespace-nowrap')}>{t.laps(v.margin)}</td>
+                    <td className={cn(TD, 'pl-6 font-medium')}>{orderText(t, v.dec.order, v.dec.commit)}</td>
+                    <td className={TD}>{val ? <Verdict val={val} commit={v.dec.commit} /> : <span className="block h-1.5 w-24 rounded-full bg-track motion-safe:animate-pulse" aria-label={t.evaluatingOne} />}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Panel>
   )
 }
 
-function orderText(order: Order, commit: boolean) {
-  if (order === 'box') return 'Бокс'
-  if (order === 'stay') return 'Мимо'
-  return commit ? 'Бокс, если чисто → заехали' : 'Бокс, если чисто → перед нами заехали'
+function orderText(t: Dict, order: Order, commit: boolean) {
+  if (order === 'box') return t.callText.box
+  if (order === 'stay') return t.callText.stay
+  return commit ? t.callText.clearIn : t.callText.clearOut
 }
 
+/** Our choice against the other option: the bar spans ±10 s */
 function Verdict({ val, commit }: { val: DecisionValue; commit: boolean }) {
+  const t = useT()
   const chosen = commit ? val.pit : val.stay
   const other = commit ? val.stay : val.pit
   const diff = other.mean - chosen.mean // > 0: our choice was faster
   const se = Math.sqrt(chosen.sd ** 2 / chosen.n + other.sd ** 2 / other.n)
-  if (Math.abs(diff) < Math.max(0.5, 2 * se)) return <span className="text-muted-foreground">равноценно</span>
-  return diff > 0 ? (
-    <span className="text-emerald-500">верно, +{diff.toFixed(1)} с</span>
-  ) : (
-    <span className="text-rose-500">лучше было {commit ? 'остаться' : 'заехать'}, {diff.toFixed(1)} с</span>
+  const even = Math.abs(diff) < Math.max(0.5, 2 * se)
+  const w = Math.min(1, Math.abs(diff) / 10) * 50
+  return (
+    <span className="flex items-center gap-3">
+      <span className="relative h-1.5 w-24 shrink-0 rounded-full bg-track max-lg:hidden" aria-hidden>
+        <span className="absolute inset-y-[-3px] left-1/2 w-px bg-muted-foreground" />
+        {!even && (
+          <span className={cn('absolute inset-y-0 rounded-full', diff > 0 ? 'left-1/2 bg-ok' : 'right-1/2 bg-hot')} style={{ width: `${w}%` }} />
+        )}
+      </span>
+      <span className={cn(even ? 'text-muted-foreground' : diff > 0 ? 'text-ok' : 'text-hot')}>
+        {even ? t.noDifference : diff > 0 ? t.rightCall(fmtS(diff)) : t.betterWas(commit, fmtS(diff))}
+      </span>
+    </span>
   )
 }

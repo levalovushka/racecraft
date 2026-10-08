@@ -1,14 +1,35 @@
 import { cn } from '@/lib/utils'
 import { CLASS, CLASS_COLOR, CLASS_TEXT } from '@/sim/model'
+import { useT } from '@/i18n'
 
-export function KartBadge({ label, cls, dim, className }: { label: number; cls: number; dim?: boolean; className?: string }) {
+/** A kart as on the track: its number on a disc of its class colour. The class is never spelled out */
+export function Kart({ label, cls, size = 'md', onClick, className }: {
+  label: number
+  cls: number
+  size?: 'md' | 'lg' | 'xl'
+  onClick?: () => void
+  className?: string
+}) {
+  const t = useT()
+  const disc = cn(
+    'inline-flex shrink-0 items-center justify-center rounded-full font-semibold tracking-tight tnum leading-none',
+    size === 'md' && 'size-[1.375rem] text-[0.6875rem]',
+    size === 'lg' && 'size-8 text-sm',
+    size === 'xl' && 'size-12 text-xl',
+  )
+  const style = { background: CLASS_COLOR[cls], color: CLASS_TEXT[cls] }
+  if (!onClick) {
+    return <span className={cn(disc, className)} style={style} role="img" aria-label={t.kartAria(label, CLASS[cls])}>{label}</span>
+  }
   return (
-    <span
-      className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums', dim && 'opacity-60', className)}
-      style={{ background: CLASS_COLOR[cls], color: CLASS_TEXT[cls] }}
+    <button
+      onClick={onClick}
+      aria-label={`${t.kartAria(label, CLASS[cls])}. ${t.rerate}`}
+      title={t.rerate}
+      className={cn(disc, 'cursor-pointer ring-offset-2 ring-offset-card transition-shadow hover:ring-2 hover:ring-ring', className)}
+      style={style}
     >
       {label}
-      <span className="rounded bg-black/20 px-1 text-[10px]">{CLASS[cls]}</span>
-    </span>
+    </button>
   )
 }

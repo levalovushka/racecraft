@@ -10,7 +10,7 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(() => ({
     ...DEFAULT_SETTINGS,
     seed: Math.floor(Math.random() * 1e6),
-    ourName: loadName() ?? DEFAULT_SETTINGS.ourName,
+    ourName: loadName() ?? '',
   }))
   const [phase, setPhase] = useState<Phase>({ kind: 'setup' })
   const [run, setRun] = useState(0)
@@ -41,7 +41,8 @@ export default function App() {
 // the name is a per-viewer convenience: storage may be unavailable, the app works without it
 function loadName(): string | null {
   try {
-    return localStorage.getItem('racecraft.name')
+    const name = localStorage.getItem('racecraft.name')
+    return name === DEFAULT_SETTINGS.ourName || name === 'Мы' ? '' : name
   } catch {
     return null
   }
