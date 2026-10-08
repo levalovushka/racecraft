@@ -606,19 +606,12 @@ export function results(r: Race): Result[] {
   return rows
 }
 
-/** Running order: by distance covered; drivers in the pit lane keep the distance they had at entry */
+/** Laps covered: in the pit lane the distance at entry, after the flag the laps finished with */
+export const distance = (d: Driver) => (d.mode === 'done' ? d.lapsDone : d.u)
+
+/** Running order: by distance covered; finishers on the same lap by who crossed first */
 export function order(r: Race): Driver[] {
-  return r.drivers.slice().sort((a, b) => {
-    if (a.mode === 'done' && b.mode === 'done') return (a.finishTime ?? 0) - (b.finishTime ?? 0)
-    if (a.mode === 'done' || b.mode === 'done') {
-      // finished drivers ahead of those who still run the same lap count
-      const la = a.lapsDone
-      const lb = b.lapsDone
-      if (la !== lb) return lb - la
-      return a.mode === 'done' ? -1 : 1
-    }
-    return b.u - a.u
-  })
+  return r.drivers.slice().sort((a, b) => distance(b) - distance(a) || (a.finishTime ?? r.t) - (b.finishTime ?? r.t))
 }
 
 export function runToEnd(r: Race, dt = P.dt) {

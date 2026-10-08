@@ -152,7 +152,7 @@ function Figure({ label, value }: { label: ReactNode; value: ReactNode }) {
   )
 }
 
-/** Gap at the line from row a to row b further back: the sum of the intervals between them */
+/** Live gap from row a to row b further back: the sum of the intervals between them */
 function gapBetween(rows: ReturnType<typeof timing>, a: number, b: number): number | null {
   let g = 0
   for (let j = a + 1; j <= b; j++) {

@@ -80,13 +80,6 @@ export function parkedTargets(r: Race): { kart: number; slot: number }[] {
   return r.box.map((kart, i) => ({ kart, slot: SLOTS[i + (busy ? 1 : 0)] }))
 }
 
-/** Order as live timing shows it: updated at the line, by laps completed, then by who crossed first */
-export function timingOrder(r: Race): Driver[] {
-  const cross = new Map(r.drivers.map((d) => [d.id, d.lapTimes.reduce((a, b) => a + b, 0)]))
-  return r.drivers.slice().sort((a, b) =>
-    b.lapsDone - a.lapsDone || cross.get(a.id)! - cross.get(b.id)! || b.u - a.u)
-}
-
 export type Status =
   | { kind: 'none' }
   | { kind: 'pit' }

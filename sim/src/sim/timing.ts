@@ -1,9 +1,7 @@
-// Live timing figures, as a timing screen shows them: updated at the line.
-import type { Driver, Race } from '@/engine/race'
-import { timingOrder } from './model'
+// Live timing figures: lap times as published at the line, positions and intervals live from the track.
+import { distance, order, type Driver, type Race } from '@/engine/race'
 
 export interface LapStats {
-  cross: number[] // race time at each completed lap
   avg: number | null // over clean laps: not lap 1, not the pit lap, not the lap after
   best: number | null
   last: number | null
@@ -12,16 +10,12 @@ export interface LapStats {
 
 export function lapStats(r: Race, d: Driver): LapStats {
   const pitLaps = new Set(r.pits.filter((p) => p.driver === d.id).map((p) => p.lap))
-  const cross: number[] = []
-  let t = 0
-  for (const x of d.lapTimes) cross.push((t += x))
   const clean = d.lapTimes.filter((_, i) => {
     const lap = i + 1
     return lap > 1 && !pitLaps.has(lap) && !pitLaps.has(lap - 1)
   })
   const nonPit = d.lapTimes.filter((_, i) => i > 0 && !pitLaps.has(i + 1))
   return {
-    cross,
     avg: clean.length ? clean.reduce((a, b) => a + b, 0) / clean.length : null,
     best: nonPit.length ? Math.min(...nonPit) : null,
     last: d.lapTimes.at(-1) ?? null,
@@ -30,17 +24,15 @@ export function lapStats(r: Race, d: Driver): LapStats {
 }
 
 /**
- * Gap to the car ahead at the line, in seconds, lapped cars included. If the car
- * ahead has already crossed the line once more than we have (we are in the pit
- * lane, or simply slower), the gap is at least the time since that crossing.
+ * Live gap to the car ahead, in seconds: the distance between them at our own
+ * clean pace. Two finishers on the same lap: the gap at the flag.
  */
-function interval(me: LapStats, ahead: LapStats | null, now: number): number | null {
-  if (!ahead) return null
-  const n = me.cross.length
-  if (n === 0 || ahead.cross.length < n) return null
-  const atLine = me.cross[n - 1] - ahead.cross[n - 1]
-  if (ahead.cross.length > n) return Math.max(atLine, now - ahead.cross[n])
-  return Math.max(0, atLine)
+function interval(r: Race, me: Driver, stats: LapStats, ahead: Driver): number {
+  if (me.mode === 'done' && ahead.mode === 'done' && me.lapsDone === ahead.lapsDone) {
+    return Math.max(0, me.finishTime! - ahead.finishTime!)
+  }
+  const pace = stats.avg ?? stats.last ?? r.track.refLap
+  return Math.max(0, (distance(ahead) - distance(me)) * pace)
 }
 
 export interface TimingRow {
@@ -51,28 +43,25 @@ export interface TimingRow {
 }
 
 export function timing(r: Race): TimingRow[] {
-  const order = timingOrder(r)
-  const stats = order.map((d) => lapStats(r, d))
-  return order.map((d, i) => ({ d, pos: i + 1, stats: stats[i], gap: i === 0 ? null : interval(stats[i], stats[i - 1], r.t) }))
+  const live = order(r)
+  const stats = live.map((d) => lapStats(r, d))
+  return live.map((d, i) => ({ d, pos: i + 1, stats: stats[i], gap: i === 0 ? null : interval(r, d, stats[i], live[i - 1]) }))
 }
 
 export const fmtLap = (x: number | null) => (x === null ? '' : x.toFixed(2))
 
 /**
  * Virtual position: the order once everyone has made the stops still ahead of
- * them. Built from what live timing publishes: line crossings, lap times and
- * the stint number (a stop counts as done once the lap it was made on is
- * complete). Everyone is brought to the leader's lap count at their own clean
- * pace, then each stop still to make costs the pit loss.
+ * them. Each driver's live gap to the leader (the sum of the intervals) plus the
+ * pit loss for every stop still to make; a stop counts as made from the lane entry.
  */
+// ponytail: while a driver is in the lane his forecast is rough (the loss builds up in the gap until he rejoins); add the lane time left if that matters
 export function virtualOrder(r: Race, rows: TimingRow[] = timing(r)): Map<number, number> {
-  const lead = Math.max(...rows.map((x) => x.d.lapsDone))
-  const projected = rows.map(({ d, stats }) => {
-    const pace = stats.avg ?? stats.last ?? r.track.refLap
-    const atLine = stats.cross.at(-1) ?? 0
-    const reflected = r.pits.filter((p) => p.driver === d.id && p.lap <= d.lapsDone).length
-    const toMake = Math.max(0, r.settings.pits - reflected)
-    return { id: d.id, t: atLine + (lead - d.lapsDone) * pace + toMake * r.settings.pitLoss }
+  let behind = 0
+  const projected = rows.map(({ d, gap }) => {
+    behind += gap ?? 0
+    const made = d.pitsDone + (d.mode === 'laneIn' || d.mode === 'wait' ? 1 : 0)
+    return { id: d.id, t: behind + Math.max(0, r.settings.pits - made) * r.settings.pitLoss }
   })
   projected.sort((a, b) => a.t - b.t)
   return new Map(projected.map((x, i) => [x.id, i + 1]))
