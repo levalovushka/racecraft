@@ -50,7 +50,7 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
         <div className="flex min-h-0 flex-col gap-3">
           <section className="relative min-h-0 flex-1" aria-label={t.track}>
             <div className="absolute inset-x-[8%] inset-y-[4%]">
-              <TrackView race={race} />
+              <TrackView race={race} onKart={rerate} />
             </div>
             <Ticker race={race} />
           </section>
