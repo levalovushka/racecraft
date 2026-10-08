@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { cn } from '@/lib/utils'
 import { CLASS, CLASS_COLOR, CLASS_TEXT } from '@/sim/model'
 import { useT } from '@/i18n'
@@ -21,15 +22,22 @@ export function Kart({ label, cls, size = 'md', onClick, className }: {
   if (!onClick) {
     return <span className={cn(disc, className)} style={style} role="img" aria-label={t.kartAria(label, CLASS[cls])}>{label}</span>
   }
+  // hover shows at once what a click does: a ring in the next class colour and an "A → B" chip
+  const next = (cls + 1) % 4
   return (
     <button
       onClick={onClick}
       aria-label={`${t.kartAria(label, CLASS[cls])}. ${t.rerate}`}
       title={t.rerate}
-      className={cn(disc, 'cursor-pointer ring-offset-2 ring-offset-card transition-shadow hover:ring-2 hover:ring-ring', className)}
-      style={style}
+      className={cn(disc, 'group relative cursor-pointer ring-offset-2 ring-offset-card outline-none hover:ring-2 hover:ring-(--next) focus-visible:ring-2 focus-visible:ring-(--next)', className)}
+      style={{ ...style, '--next': CLASS_COLOR[next] } as CSSProperties}
     >
       {label}
+      <span aria-hidden className="pointer-events-none absolute top-1/2 right-full z-10 mr-1.5 hidden -translate-y-1/2 rounded-md border bg-popover px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap group-hover:block group-focus-visible:block">
+        <span style={{ color: CLASS_COLOR[cls] }}>{CLASS[cls]}</span>
+        <span className="text-muted-foreground"> → </span>
+        <span style={{ color: CLASS_COLOR[next] }}>{CLASS[next]}</span>
+      </span>
     </button>
   )
 }

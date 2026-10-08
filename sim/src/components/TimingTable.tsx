@@ -8,7 +8,7 @@ import { driverName, useT, type Dict } from '@/i18n'
 import type { Status } from '@/sim/model'
 
 // column widths: position, driver, kart, interval, last, best, average, stint, stops, status
-const COLS = ['2.25rem', '18%', '3.5rem', '10%', '9%', '9%', '9%', '7%', '7%', 'auto']
+const COLS = ['2.25rem', '18%', '3.5rem', '10%', '9%', '9%', '9%', '8%', '6%', 'auto']
 const TH = 'h-8 px-2 text-left align-middle font-normal caption'
 const TD = 'h-[clamp(1.5rem,3.2vh,1.875rem)] border-t px-2 align-middle'
 
@@ -31,7 +31,7 @@ export function TimingTable({ race, onChange }: { race: Race; onChange: () => vo
           <th scope="col" className={cn(TH, 'text-right')}>{t.cols.last}</th>
           <th scope="col" className={cn(TH, 'text-right')}>{t.cols.best}</th>
           <th scope="col" className={cn(TH, 'text-right')}>{t.cols.avg}</th>
-          <th scope="col" className={cn(TH, 'text-right')}>{t.cols.stint}</th>
+          <th scope="col" className={cn(TH, 'text-right')} title={t.stintHint}>{t.cols.stint}</th>
           <th scope="col" className={cn(TH, 'text-right')}>{t.cols.stops}</th>
           <th scope="col" className={cn(TH, 'pl-5')}>{t.cols.status}</th>
         </tr>
