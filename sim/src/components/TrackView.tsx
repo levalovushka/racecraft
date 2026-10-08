@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import type { Race } from '@/engine/race'
 import { pitXY } from '@/engine/track'
+import { useT } from '@/i18n'
 import { CLASS_COLOR, CLASS_TEXT, driverXY, ourClass, parkedTargets, SHAPE, TRACK } from '@/sim/model'
 
 const SHIFT_TIME = 1.2 // s of race time for a parked kart to roll one slot forward
@@ -51,6 +52,7 @@ function useParked(race: Race) {
 }
 
 export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number) => void }) {
+  const t = useT()
   const red = race.t < race.greenAt
   const [lx1, ly1, lx2, ly2] = SHAPE.line
   const [gx, gy, gw, gh] = SHAPE.light
@@ -61,7 +63,7 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
     .sort((a, b) => Number(a.d.isUs) - Number(b.d.isUs))
 
   return (
-    <svg viewBox={SHAPE.viewBox} className="h-full w-full select-none" role="img" aria-label="Track map">
+    <svg viewBox={SHAPE.viewBox} className="h-full w-full select-none" role="img" aria-label={t.track}>
       <defs>
         <mask id="tv-resin-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1578" height="1578" style={{ maskType: 'alpha' }}>
           <path d={SHAPE.resinMask} fillRule="evenodd" fill="#191919" />

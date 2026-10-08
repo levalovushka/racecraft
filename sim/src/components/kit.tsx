@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { useSetLang, useT, type Lang } from '@/i18n'
 
 export function Panel({ className, children }: { className?: string; children: ReactNode }) {
   return <section className={cn('rounded-panel bg-card', className)}>{children}</section>
@@ -16,5 +17,31 @@ export function Wordmark({ className }: { className?: string }) {
       </svg>
       racecraft
     </span>
+  )
+}
+
+/** The logo with the language switch beside it, on every screen */
+export function Brand({ className }: { className?: string }) {
+  const t = useT()
+  const setLang = useSetLang()
+  const LANGS: [Lang, string][] = [['en', 'EN'], ['ru', 'RU']]
+  return (
+    <div className={cn('flex items-center gap-4', className)}>
+      <Wordmark />
+      <div className="flex text-xs" role="group" aria-label={t.language}>
+        {LANGS.map(([l, label]) => (
+          <button
+            key={l}
+            lang={l}
+            aria-pressed={t.lang === l}
+            onClick={() => setLang(l)}
+            className={cn('h-7 w-8 rounded-md font-medium transition-colors',
+              t.lang === l ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground')}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }

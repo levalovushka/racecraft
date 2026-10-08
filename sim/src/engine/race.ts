@@ -138,12 +138,13 @@ export interface LogItem {
   t: number
   text: string
   us?: boolean
-  kind?: 'pit' | 'kart' | 'overtake' | 'flag'
+  kind?: 'pit' | 'kart' | 'overtake' | 'flag' | 'skip'
   driver?: number // who the event is about
   other?: number // overtake: the other driver
   ourGain?: boolean // overtake: we passed (true) or were passed (false)
   from?: number // kart change: kart ids
   to?: number
+  wait?: number // kart change: seconds under red
 }
 
 export interface Race {
@@ -416,7 +417,7 @@ export function step(r: Race, dt = P.dt) {
         d.conditional = false
         const last = r.decisions.at(-1)
         if (last && last.lap === d.lapsDone) last.commit = false
-        if (d.isUs) log(r, 'Someone went in ahead — staying out', true)
+        if (d.isUs) log(r, 'Someone went in ahead — staying out', true, { kind: 'skip', driver: d.id })
       } else {
         enterLane(r, d, Math.floor(u1 - tr.tauPitIn) + tr.tauPitIn)
       }
@@ -554,7 +555,7 @@ function laneStep(r: Race) {
     })
     const k = (id: number) => r.karts[id].label
     log(r, `${d.name}: kart ${k(from)} → ${k(to)}${wait > 0.5 ? `, waited ${wait.toFixed(1)} s` : ''}`, d.isUs,
-      { kind: 'kart', driver: d.id, from, to })
+      { kind: 'kart', driver: d.id, from, to, wait })
   }
 }
 
