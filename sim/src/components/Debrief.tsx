@@ -23,12 +23,12 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
   const botRow = results(bot.race).find((x) => x.driver.isUs)!
   const ourScore = score({ total: ours.total, pos: ours.pos, laps: ours.laps, dsq: ours.dsq }, race)
   const botScore = score(bot.outcome, bot.race)
-  const delta = botScore - ourScore // > 0: we beat the bot
+  const delta = ourScore - botScore // minus = we beat the bot, as in «Куда ушло время»
   const decisions = useMemo(() => interestingDecisions(race), [race])
   const ourLoss = lossBreakdown(race)
   const botLoss = lossBreakdown(bot.race)
   const name = driverName(t, race.drivers[0])
-  const even = Math.abs(delta) < 0.5
+  const even = Math.abs(delta) < 0.05 // shows as 0.0: anything bigger must match the «Итого» difference
 
   return (
     <div className="min-h-screen">
@@ -48,12 +48,12 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
           <Panel className="p-7">
             <h2 className="caption">{t.againstBot}</h2>
-            <div className={cn('mt-3 text-hero font-semibold tnum', even ? 'text-foreground' : delta > 0 ? 'text-ok' : 'text-hot')}>
+            <div className={cn('mt-3 text-hero font-semibold tnum', even ? 'text-foreground' : delta < 0 ? 'text-ok' : 'text-hot')}>
               {even ? '±0' : fmtS(delta)}
               <span className="ml-2 text-2xl font-medium text-muted-foreground">{t.s}</span>
             </div>
             <p className="mt-4 max-w-[30rem] text-sm text-pretty text-muted-foreground">
-              {even ? t.level : delta > 0 ? t.beat : t.worse}{' '}{t.sameKarts}
+              {even ? t.level : delta < 0 ? t.beat : t.worse}{' '}{t.sameKarts}
             </p>
           </Panel>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
@@ -348,12 +348,12 @@ function orderText(t: Dict, order: Order, commit: boolean) {
   return commit ? t.callText.clearIn : t.callText.clearOut
 }
 
-/** Our choice against the other option: the bar spans ±10 s */
+/** Our choice against the other option, minus = our choice gained: the bar spans ±10 s, gain to the left */
 function Verdict({ val, commit }: { val: DecisionValue; commit: boolean }) {
   const t = useT()
   const chosen = commit ? val.pit : val.stay
   const other = commit ? val.stay : val.pit
-  const diff = other.mean - chosen.mean // > 0: our choice was faster
+  const diff = chosen.mean - other.mean // minus = our choice was faster
   const se = Math.sqrt(chosen.sd ** 2 / chosen.n + other.sd ** 2 / other.n)
   const even = Math.abs(diff) < Math.max(0.5, 2 * se)
   const w = Math.min(1, Math.abs(diff) / 10) * 50
@@ -362,11 +362,11 @@ function Verdict({ val, commit }: { val: DecisionValue; commit: boolean }) {
       <span className="relative h-1.5 w-24 shrink-0 rounded-full bg-track max-lg:hidden" aria-hidden>
         <span className="absolute inset-y-[-3px] left-1/2 w-px bg-muted-foreground" />
         {!even && (
-          <span className={cn('absolute inset-y-0 rounded-full', diff > 0 ? 'left-1/2 bg-ok' : 'right-1/2 bg-hot')} style={{ width: `${w}%` }} />
+          <span className={cn('absolute inset-y-0 rounded-full', diff < 0 ? 'right-1/2 bg-ok' : 'left-1/2 bg-hot')} style={{ width: `${w}%` }} />
         )}
       </span>
-      <span className={cn(even ? 'text-muted-foreground' : diff > 0 ? 'text-ok' : 'text-hot')}>
-        {even ? t.noDifference : diff > 0 ? t.rightCall(fmtS(diff)) : t.betterWas(commit, fmtS(diff))}
+      <span className={cn(even ? 'text-muted-foreground' : diff < 0 ? 'text-ok' : 'text-hot')}>
+        {even ? t.noDifference : diff < 0 ? t.rightCall(fmtS(diff)) : t.betterWas(commit, fmtS(diff))}
       </span>
     </span>
   )
