@@ -233,25 +233,51 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
     }
     return { decisions: out, until }
   }, [all])
-  const [values, setValues] = useState<Record<number, DecisionValue>>({})
+  const [values, setValues] = useState<Record<number, DecisionValue | 'failed'>>({})
+  const [progress, setProgress] = useState<Record<number, number>>({}) // 0..1 per decision
   useEffect(() => {
-    if (decisions.length === 0) return
-    const w = new Worker(new URL('../sim/evalWorker.ts', import.meta.url), { type: 'module' })
-    w.onmessage = (e: MessageEvent<{ id: number; value: DecisionValue }>) => {
-      setValues((v) => ({ ...v, [e.data.id]: e.data.value }))
+    // one worker per decision, at most cores − 1 at once
+    const queue = [...decisions]
+    const live = new Set<Worker>()
+    let stopped = false
+    const next = () => {
+      const v = queue.shift()
+      if (!v) return
+      const w = new Worker(new URL('../sim/evalWorker.ts', import.meta.url), { type: 'module' })
+      live.add(w)
+      const finish = (val: DecisionValue | 'failed') => {
+        w.terminate()
+        live.delete(w)
+        if (stopped) return
+        setValues((x) => ({ ...x, [v.index]: val }))
+        next()
+      }
+      w.onmessage = (e: MessageEvent<{ id: number; value?: DecisionValue; progress?: { done: number; of: number } }>) => {
+        if (stopped) return
+        const { value, progress: p } = e.data
+        if (value) finish(value)
+        else if (p) setProgress((x) => ({ ...x, [v.index]: p.done / p.of }))
+      }
+      w.onerror = w.onmessageerror = () => finish('failed')
+      w.postMessage({ id: v.index, dec: v.dec, n: 24 })
     }
-    for (const v of decisions) w.postMessage({ id: v.index, dec: v.dec, n: 24 })
-    return () => w.terminate()
+    const slots = Math.max(1, (navigator.hardwareConcurrency || 2) - 1)
+    for (let i = 0; i < slots; i++) next()
+    return () => {
+      stopped = true
+      for (const w of live) w.terminate()
+    }
   }, [decisions])
-  const done = decisions.filter((v) => values[v.index]).length
+  const pending = decisions.filter((v) => !values[v.index]).length
+  const pct = Math.floor(100 * decisions.reduce((a, v) => a + (values[v.index] ? 1 : progress[v.index] ?? 0), 0) / Math.max(1, decisions.length))
 
   return (
     <Panel className="p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-sm font-medium">{t.calls}</h2>
         <span className="caption" role="status">
-          {done < decisions.length
-            ? <span className="flex items-center gap-1.5"><Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden /> {t.evaluating(done, decisions.length)}</span>
+          {pending > 0
+            ? <span className="flex items-center gap-1.5"><Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden /> {t.evaluating(pct)}</span>
             : t.callsNote}
         </span>
       </div>
@@ -291,7 +317,15 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
                     <td className={cn(TD, 'text-right whitespace-nowrap', v.wait > 0.5 ? 'text-hot' : 'text-muted-foreground')}>{v.wait > 0.5 ? `${v.wait.toFixed(0)} ${t.s}` : '—'}</td>
                     <td className={cn(TD, 'text-right whitespace-nowrap')}>{t.laps(v.margin)}</td>
                     <td className={cn(TD, 'pl-6 font-medium')}>{orderText(t, v.dec.order, v.dec.commit)}</td>
-                    <td className={TD}>{val ? <Verdict val={val} commit={v.dec.commit} /> : <span className="block h-1.5 w-24 rounded-full bg-track motion-safe:animate-pulse" aria-label={t.evaluatingOne} />}</td>
+                    <td className={TD}>
+                      {val === 'failed' ? <span className="text-muted-foreground">{t.evalFailed}</span>
+                        : val ? <Verdict val={val} commit={v.dec.commit} />
+                        : (
+                          <span className="block h-1.5 w-24 overflow-hidden rounded-full bg-track" role="progressbar" aria-label={t.evaluatingOne} aria-valuenow={Math.round(100 * (progress[v.index] ?? 0))}>
+                            <span className="block h-full rounded-full bg-muted-foreground transition-[width]" style={{ width: `${100 * (progress[v.index] ?? 0)}%` }} />
+                          </span>
+                        )}
+                    </td>
                   </tr>
                 )
               })}

@@ -43,8 +43,9 @@ export interface DecisionValue {
   stay: OptionValue
 }
 
-/** Monte Carlo from the decision point: both options, our driver then played by the bot */
-export function evaluateDecision(dec: Decision, n = 24): DecisionValue {
+/** Monte Carlo from the decision point: both options, our driver then played by the bot; onRun ticks after every continuation */
+export function evaluateDecision(dec: Decision, n = 24, onRun?: (done: number, of: number) => void): DecisionValue {
+  let done = 0
   const run = (commit: boolean): OptionValue => {
     const xs: number[] = []
     let pos = 0
@@ -59,6 +60,7 @@ export function evaluateDecision(dec: Decision, n = 24): DecisionValue {
       const o = ourOutcome(c)
       xs.push(score(o, c))
       pos += o.pos
+      onRun?.(++done, 2 * n)
     }
     const mean = xs.reduce((a, b) => a + b, 0) / n
     const sd = Math.sqrt(xs.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, n - 1))
