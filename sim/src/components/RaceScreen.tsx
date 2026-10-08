@@ -60,7 +60,7 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
         </div>
         <aside className="flex min-h-0 flex-col gap-3">
           <YouPanel race={race} rerate={rerate} />
-          <ForecastPanel race={race} rerate={rerate} />
+          <ForecastPanel race={race} />
           <DecisionPanel race={race} command={command} />
         </aside>
       </main>
@@ -273,53 +273,58 @@ function ourEntry(race: Race): number | null {
 }
 
 /**
- * What happens at the pit entry before ours, without us: the box, then every
- * driver who goes in, in the order of the entry, with the kart he takes. When a
- * stop is not ours to call, the same over the next lap.
+ * The box conveyor without us: every stop still to come, in order, with the
+ * kart each driver hands over and the one he takes. Our next entry is a line in
+ * the list: whatever is above it decides the kart we get now.
  */
-function ForecastPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void }) {
+function ForecastPanel({ race }: { race: Race }) {
   const t = useT()
   const me = us(race)
   const label = (k: number) => race.karts[k].label
   const tIn = ourEntry(race)
-  const goers = forecast(race, tIn ?? (me.lapT || 30)).slice(0, 4)
-  const [first, second] = race.box
+  const goers = forecast(race)
+  const cut = tIn === null ? -1 : goers.findIndex((g) => !g.lane && g.t > tIn)
+  const at = cut === -1 && tIn !== null ? goers.length : cut
+  const soon = me.lapT || 30
+
+  const rows: ReactNode[] = goers.map((g) => (
+    <li key={g.d.id} className={cn('contents', !g.lane && g.t > soon && 'text-muted-foreground')}>
+      <span className="text-right text-muted-foreground">
+        {g.lane ? t.nowShort : g.t < soon ? `${Math.round(g.t)} ${t.s}` : t.inLaps(Math.round(g.t / soon))}
+      </span>
+      <Kart label={label(g.d.kart)} cls={ourClass(race, g.d.kart)} />
+      <span className="truncate">{driverName(t, g.d)}</span>
+      <ArrowRight className="size-3.5 text-muted-foreground" aria-label={t.takes} />
+      <Kart label={label(g.kart)} cls={ourClass(race, g.kart)} />
+      {/* burning is an alarm only on this lap; further out it is just where his window ends */}
+      <span className={cn('text-right', g.burning && g.t < soon ? 'text-hot' : 'text-muted-foreground')}>
+        {g.burning ? (g.t < soon ? t.status.burning.toLowerCase() : t.deadline) : g.sure ? '' : t.maybe}
+      </span>
+    </li>
+  ))
+  if (at >= 0) {
+    rows.splice(at, 0, (
+      <li key="us" className="col-span-6 flex items-center gap-3 py-0.5 text-xs text-foreground tnum">
+        <span className="h-px flex-1 bg-foreground/40" />
+        {t.yourEntry} · {tIn!.toFixed(1)} {t.s}
+        <span className="h-px flex-1 bg-foreground/40" />
+      </li>
+    ))
+  }
 
   return (
-    <Panel className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 short:gap-3">
+    <Panel className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium">{t.forecast}</h2>
         <Light race={race} />
       </div>
-
-      <section className="flex items-center gap-5">
-        <h3 className="caption w-[3.75rem] shrink-0">{t.inTheBox}</h3>
-        {[[first, t.first], [second, t.second]].map(([k, name]) => (
-          <span key={name as string} className="flex items-center gap-2.5 text-sm text-muted-foreground">
-            <Kart size="lg" label={label(k as number)} cls={ourClass(race, k as number)} onClick={() => rerate(k as number)} />
-            {name}
-          </span>
-        ))}
-      </section>
-
-      {!race.flag && (
-        <section className="min-h-0">
-          <h3 className="caption tnum">{tIn === null ? t.overNextLap : `${t.beforeYourEntry} · ${tIn.toFixed(1)} ${t.s}`}</h3>
-          <ol className="mt-2 grid grid-cols-[3.75rem_auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1.5 text-sm tnum">
-            {goers.map((g) => (
-              <li key={g.d.id} className="contents">
-                <span className="text-right text-muted-foreground">{g.lane ? t.inLaneShort : `${g.tEntry.toFixed(1)} ${t.s}`}</span>
-                <Kart label={label(g.d.kart)} cls={ourClass(race, g.d.kart)} />
-                <span className="truncate">{driverName(t, g.d)}</span>
-                <span className="text-right text-muted-foreground">{g.sure ? t.takes : t.mayTake}</span>
-                <Kart label={label(g.kart)} cls={ourClass(race, g.kart)} />
-              </li>
-            ))}
-            {goers.length === 0 && (
-              <li className="col-span-5 text-muted-foreground">{tIn === null ? t.nobodyGoesIn : t.nobodyBefore}</li>
-            )}
-          </ol>
-        </section>
+      {goers.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{race.flag ? t.boxClosed : t.noStopsLeft}</p>
+      ) : (
+        // the list runs on below the fold: fade it out rather than cut a row in half
+        <ol className="grid min-h-0 flex-1 auto-rows-min grid-cols-[4rem_auto_minmax(0,1fr)_auto_auto_4rem] items-center gap-x-3 gap-y-2 overflow-hidden text-sm tnum [mask-image:linear-gradient(to_bottom,black_calc(100%-2.5rem),transparent)]" aria-label={t.forecastAria}>
+          {rows}
+        </ol>
       )}
     </Panel>
   )
@@ -364,7 +369,7 @@ function DecisionPanel({ race, command }: { race: Race; command: (o: Order) => v
   } else if (me.mode === 'box') note = t.outIn(Math.max(0, Math.ceil(me.laneT1 - race.t)))
   else if (me.mode === 'laneOut') note = t.rejoining
   else if (tIn !== null) {
-    const ahead = forecast(race, tIn).filter((g) => !g.lane)
+    const ahead = forecast(race).filter((g) => !g.lane && g.t < tIn)
     const ifBox = projectRejoin(race, ahead.map((g) => g.d))!
     const ifClear = projectRejoin(race)!
     const laneBusy = laneClearAt(race) > race.t + tIn
@@ -376,7 +381,7 @@ function DecisionPanel({ race, command }: { race: Race; command: (o: Order) => v
       : t.inHand(t.laps(si.margin - 1))
     outcome.box = kartWith(ifBox)
     outcome.boxIfClear = laneBusy ? t.laneBusy
-      : ahead.length ? <><Kart label={label(ifClear.kart)} cls={ourClass(race, ifClear.kart)} /><span>{t.ifStayOut(ahead.map((g) => driverName(t, g.d)))}</span></>
+      : ahead.length ? <><Kart label={label(ifClear.kart)} cls={ourClass(race, ifClear.kart)} /><span>{ahead.length > 1 ? t.ifNobodyGoesIn : t.ifStaysOutN(driverName(t, ahead[0].d))}</span></>
       : kartWith(ifClear)
   }
 

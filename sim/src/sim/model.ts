@@ -111,36 +111,49 @@ export function publicStatus(r: Race, d: Driver): Status {
 
 export interface Goer {
   d: Driver
-  tEntry: number // s to the pit entry; 0 for a driver already in the lane
+  t: number // s to his pit entry; 0 for a driver already in the lane
   kart: number // the kart he will take
+  burning: boolean // goes in whatever the box holds
   sure: boolean // in the lane, burning or 2+ classes up; otherwise he may stay out
   lane: boolean
 }
 
 /**
- * Who goes in within `horizon` seconds and which kart each takes, by the entry
- * rule and the MANAGER's ratings. Applied in the order of the entry: every driver
- * who goes in takes the next kart off the ribbon and puts his own on the end, so
- * the next one judges a different kart. Our own driver is left out: that is the decision.
+ * The stops still to come, in order, and the kart each driver takes: the box
+ * conveyor as the manager's board would run it. Drivers in the lane first, then
+ * every entry of every rival lap by lap: he goes in once the minimum stint is
+ * done and the next kart on the ribbon is a class better than his by the
+ * MANAGER's ratings, or when he burns. Whoever goes in takes the next kart and
+ * puts his own on the end, so the next one judges a different kart. One stop per
+ * driver; our own driver is left out: that is the decision.
  */
-export function forecast(r: Race, horizon: number): Goer[] {
+export function forecast(r: Race, limit = 8): Goer[] {
+  const s = r.settings
   const lane = queueBefore(r, null, true)
   const tape = ribbon(r, lane)
-  const out: Goer[] = lane.map((d, i) => ({ d, tEntry: 0, kart: tape[i], sure: true, lane: true }))
+  const out: Goer[] = lane.map((d, i) => ({ d, t: 0, kart: tape[i], burning: false, sure: true, lane: true }))
   if (r.flag) return out
-  const cand = r.drivers
-    .filter((d) => !d.isUs && d.mode === 'track' && d.pitsDone < r.settings.pits)
-    .map((d) => ({ d, tEntry: timeToPitIn(r, d) }))
-    .filter((c) => c.tEntry < horizon)
-    .sort((a, b) => a.tEntry - b.tEntry)
-  for (const { d, tEntry } of cand) {
-    if (!stintInfo(r, d).eligible) continue
+  const entries: { d: Driver; k: number; t: number }[] = []
+  for (const d of r.drivers) {
+    if (d.isUs || d.mode !== 'track' || d.pitsDone >= s.pits) continue
+    const t0 = timeToPitIn(r, d)
+    for (let k = 0; d.lapsDone + 1 + k <= s.laps; k++) entries.push({ d, k, t: t0 + k * d.lapT })
+  }
+  entries.sort((a, b) => a.t - b.t)
+  const gone = new Set<Driver>()
+  for (const { d, k, t } of entries) {
+    if (out.length >= limit) break
+    if (gone.has(d)) continue
+    const si = stintInfo(r, d)
+    if (si.curLen + k < s.minStint) continue
+    // now: the board's own urgency, queue included; later: plain laps in hand
+    const burning = k === 0 ? hunger(r, d, us(r).perceived, true) === 'burning' : si.margin - k <= 1
     const kart = tape[out.length]
-    const burning = hunger(r, d, us(r).perceived, true) === 'burning'
     const gain = ourClass(r, d.kart) - ourClass(r, kart)
     if (!burning && gain < 1) continue
-    out.push({ d, tEntry, kart, sure: burning || gain >= 2, lane: false })
+    out.push({ d, t, kart, burning, sure: burning || gain >= 2, lane: false })
     tape.push(d.kart)
+    gone.add(d)
   }
   return out
 }
