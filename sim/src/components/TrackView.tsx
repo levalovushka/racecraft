@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { P, type Driver, type Race } from '@/engine/race'
 import { pitXY, xyOfTau } from '@/engine/track'
 import { useT } from '@/i18n'
-import { CLASS_COLOR, CLASS_TEXT, driverXY, ourClass, parkedTargets, SHAPE, TRACK } from '@/sim/model'
+import { CLASS, CLASS_COLOR, CLASS_TEXT, driverXY, ourClass, parkedTargets, SHAPE, TRACK } from '@/sim/model'
 
 const SHIFT_TIME = 1.2 // s of race time for a parked kart to roll one slot forward
 const GRID_SIDE = 24 // px either side of the racing line for the two grid columns
@@ -12,10 +12,11 @@ const R = 26
 // the blurred racing line ("вкат") is hidden for now: the interface went flat
 const SHOW_RESIN = false
 
-function KartDot({ x, y, label, cls, us, onClick }: { x: number; y: number; label: number; cls: number; us?: boolean; onClick?: () => void }) {
+function KartDot({ x, y, label, cls, us, onClick, onHover }: { x: number; y: number; label: number; cls: number; us?: boolean; onClick?: () => void; onHover?: (on: boolean) => void }) {
   const t = useT()
   return (
-    <g transform={`translate(${x} ${y})`} onClick={onClick} className={onClick ? 'cursor-pointer' : undefined} aria-label={onClick ? t.rerate : undefined}>
+    <g transform={`translate(${x} ${y})`} onClick={onClick} className={onClick ? 'cursor-pointer' : undefined} aria-label={onClick ? t.rerate : undefined}
+      onPointerEnter={onHover && (() => onHover(true))} onPointerLeave={onHover && (() => onHover(false))}>
       {onClick && <title>{t.rerate}</title>}
       {us && <circle r={R + 6} fill="none" stroke="white" strokeWidth={3} />}
       <circle r={R} fill={CLASS_COLOR[cls]} />
@@ -29,6 +30,26 @@ function KartDot({ x, y, label, cls, us, onClick }: { x: number; y: number; labe
         style={{ fontVariantNumeric: 'tabular-nums lining-nums' }}
       >
         {label}
+      </text>
+    </g>
+  )
+}
+
+/** What a click on the kart under the pointer does: a ring in the next class colour and an "A → B" chip, drawn last so nothing covers it */
+function NextClass({ x, y, cls }: { x: number; y: number; cls: number }) {
+  const next = (cls + 1) % 4
+  const [w, h] = [150, 60]
+  const [left, top, right] = [184, 240, 1434] // SHAPE.viewBox
+  const cx = Math.min(Math.max(x, left + w / 2), right - w / 2)
+  const cy = y - R - 14 - h > top ? y - R - 14 - h / 2 : y + R + 14 + h / 2
+  return (
+    <g pointerEvents="none">
+      <circle cx={x} cy={y} r={R + 4} fill="none" stroke={CLASS_COLOR[next]} strokeWidth={6} />
+      <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx={14} fill="#111" stroke="white" strokeOpacity={0.2} />
+      <text x={cx} y={cy + 14} textAnchor="middle" fontSize={40} fontWeight={600}>
+        <tspan fill={CLASS_COLOR[cls]}>{CLASS[cls]}</tspan>
+        <tspan fill="white" fillOpacity={0.6}> → </tspan>
+        <tspan fill={CLASS_COLOR[next]}>{CLASS[next]}</tspan>
       </text>
     </g>
   )
@@ -79,6 +100,8 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
   const [gx, gy, gw, gh] = SHAPE.light
   const parked = useParked(race)
   const grid = useGrid(race)
+  const [hover, setHover] = useState<number | null>(null) // kart under the pointer
+  const hoverOn = (kart: number) => onKart && ((on: boolean) => setHover(on ? kart : null))
   const cars = race.drivers
     .map((d) => {
       const xy = driverXY(race, d)
@@ -86,6 +109,8 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
     })
     .filter((c) => c.xy)
     .sort((a, b) => Number(a.d.isUs) - Number(b.d.isUs))
+  const hoverParked = parked.find((p) => p.kart === hover)
+  const hoverXY = hoverParked ? pitXY(TRACK, hoverParked.f) : cars.find((c) => c.d.kart === hover)?.xy
 
   return (
     <svg viewBox={SHAPE.viewBox} className="h-full w-full select-none" role="img" aria-label={t.track}>
@@ -123,12 +148,14 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
 
       {parked.map(({ kart, f }) => {
         const [x, y] = pitXY(TRACK, f)
-        return <KartDot key={`k${kart}`} x={x} y={y} label={race.karts[kart].label} cls={ourClass(race, kart)} onClick={onKart && (() => onKart(kart))} />
+        return <KartDot key={`k${kart}`} x={x} y={y} label={race.karts[kart].label} cls={ourClass(race, kart)} onClick={onKart && (() => onKart(kart))} onHover={hoverOn(kart)} />
       })}
 
       {cars.map(({ d, xy }) => (
-        <KartDot key={d.id} x={xy![0]} y={xy![1]} label={race.karts[d.kart].label} cls={ourClass(race, d.kart)} us={d.isUs} onClick={onKart && (() => onKart(d.kart))} />
+        <KartDot key={d.id} x={xy![0]} y={xy![1]} label={race.karts[d.kart].label} cls={ourClass(race, d.kart)} us={d.isUs} onClick={onKart && (() => onKart(d.kart))} onHover={hoverOn(d.kart)} />
       ))}
+
+      {hoverXY && <NextClass x={hoverXY[0]} y={hoverXY[1]} cls={ourClass(race, hover!)} />}
     </svg>
   )
 }
