@@ -92,7 +92,8 @@ function AppBar({ race, paused, speed, onPause, onSpeed, onFinish }: {
     <header className="grid h-10 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-6 pl-2 text-sm">
       <Brand />
       <RaceState race={race} />
-      {race.flag ? (
+      {/* only once we are across the line: the debrief finishes the rest, never our own last lap */}
+      {us(race).mode === 'done' ? (
         <Button size="lg" onClick={onFinish} className="h-10 justify-self-end px-4">{t.openDebrief} <ArrowRight /></Button>
       ) : (
         <div className="flex items-center justify-self-end gap-3">

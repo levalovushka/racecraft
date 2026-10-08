@@ -326,7 +326,8 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
                       </span>
                     </td>
                     <td className={cn(TD, 'text-right whitespace-nowrap', v.wait > 0.5 ? 'text-hot' : 'text-muted-foreground')}>{v.wait > 0.5 ? `${v.wait.toFixed(0)} ${t.s}` : '—'}</td>
-                    <td className={cn(TD, 'text-right whitespace-nowrap')}>{t.laps(v.margin)}</td>
+                    {/* below zero: past the last lap that still leaves room for the remaining minimum stints */}
+                    <td className={cn(TD, 'text-right whitespace-nowrap', v.margin < 0 && 'text-hot')}>{v.margin < 0 ? t.marginLate(-v.margin) : t.laps(v.margin)}</td>
                     <td className={cn(TD, 'pl-6 font-medium')}>{orderText(t, v.dec.order, v.dec.commit)}</td>
                     <td className={TD}>
                       {val === 'failed' ? <span className="text-muted-foreground">{t.evalFailed}</span>
