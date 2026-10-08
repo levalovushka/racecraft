@@ -54,8 +54,7 @@ export function RaceScreen({ settings, onFinish }: { settings: Settings; onFinis
             </div>
             <Ticker race={race} />
           </section>
-          <Panel className="shrink-0 px-1 pt-3 pb-2">
-            <RaceState race={race} />
+          <Panel className="shrink-0 px-1 pt-1 pb-2">
             <TimingTable race={race} onChange={sim.refresh} />
           </Panel>
         </div>
@@ -87,12 +86,13 @@ function AppBar({ race, paused, speed, onPause, onSpeed, onFinish }: {
 }) {
   const t = useT()
   return (
-    <header className="flex h-10 shrink-0 items-center justify-between gap-6 pl-2 text-sm">
+    <header className="grid h-10 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-6 pl-2 text-sm">
       <Brand />
+      <RaceState race={race} />
       {race.flag ? (
-        <Button size="lg" onClick={onFinish} className="h-10 px-4">{t.openDebrief} <ArrowRight /></Button>
+        <Button size="lg" onClick={onFinish} className="h-10 justify-self-end px-4">{t.openDebrief} <ArrowRight /></Button>
       ) : (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-self-end gap-3">
           <div className="flex" role="group" aria-label={t.speed}>
             {SPEEDS.map((s, i) => (
               <button
@@ -125,21 +125,17 @@ function AppBar({ race, paused, speed, onPause, onSpeed, onFinish }: {
   )
 }
 
-/** Lap, progress and clock as the head of the timing, where a broadcast keeps them */
+/** Lap and clock: one line in the middle of the header, the size of everything around it */
 function RaceState({ race }: { race: Race }) {
   const t = useT()
   const n = race.settings.laps
   const lap = Math.min(Math.max(1, race.drivers.reduce((m, d) => Math.max(m, d.lapsDone + 1), 0)), n)
-  const progress = Math.min(1, Math.max(...race.drivers.map((d) => d.u)) / n)
   return (
-    <div className="flex items-center gap-4 px-3 pb-2 text-sm tnum">
-      <span className="shrink-0 font-semibold">
+    <div className="flex items-baseline gap-4 tnum">
+      <span className="font-semibold">
         {race.flag ? t.flag : <>{t.lap} {lap} <span className="font-normal text-muted-foreground">{t.of} {n}</span></>}
       </span>
-      <span className="h-0.5 flex-1 rounded-full bg-track" aria-hidden>
-        <span className="block h-full rounded-full bg-muted-foreground" style={{ width: `${progress * 100}%` }} />
-      </span>
-      <span className="shrink-0 text-muted-foreground">{fmtTime(race.t)}</span>
+      <span className="w-14 text-muted-foreground">{fmtTime(race.t)}</span>
     </div>
   )
 }
@@ -257,10 +253,10 @@ const ORDERS: { value: Order; key: string }[] = [
 ]
 
 /**
- * One question: should we box this lap. (a) What is in the box and what we get,
- * as conditions on the rival who reaches the entry first; (b) who those rivals
- * are and what they would swap. The countdown to the decision point runs inside
- * the chosen order. Outcome and rivals come from the same contender list.
+ * One question: should we box this lap. Three sections on one left edge:
+ * what is in the box, the queue to the pit entry (rivals who would take the
+ * first kart, then us), and what a stop gives us on each branch. The countdown to the
+ * decision point runs inside the chosen order.
  */
 function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) => void; rerate: (kart: number) => void }) {
   const t = useT()
@@ -283,62 +279,44 @@ function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) =
 
   // rivals who reach the entry before us and would take the first kart
   const cont = contenders(race)
-  const before = locked ? cont.filter((c) => !c.d.isUs) : cont.filter((c) => !c.d.isUs && c.tEntry < tIn)
+  const before = (locked ? cont.filter((c) => !c.d.isUs) : cont.filter((c) => !c.d.isUs && c.tEntry < tIn)).slice(0, 2)
   const rival = before[0]
   const ifOut = projectRejoin(race)
   const ifIn = rival ? projectRejoin(race, [rival.d]) : null
-  // laps until the first rival on track clears the minimum stint
-  const lockedFor = Math.min(...race.drivers
-    .filter((d) => d.mode === 'track' && d.pitsDone < race.settings.pits && !d.isUs)
-    .map((d) => Math.max(0, race.settings.minStint - stintInfo(race, d).curLen)))
-  const nobodyCan = !race.drivers.some((d) => !d.isUs && d.mode === 'track' && d.pitsDone < race.settings.pits && stintInfo(race, d).eligible)
+  const rivalsOnTrack = race.drivers.filter((d) => !d.isUs && d.mode === 'track' && d.pitsDone < race.settings.pits)
+  const nobodyCan = !rivalsOnTrack.some((d) => stintInfo(race, d).eligible)
+  const lockedFor = Math.min(...rivalsOnTrack.map((d) => Math.max(0, race.settings.minStint - stintInfo(race, d).curLen)))
 
-  const outcome = (o: NonNullable<typeof ifOut>) => (
-    <>
+  const result = (o: NonNullable<typeof ifOut>) => (
+    <span className="flex items-center gap-2">
       <Kart label={label(o.kart)} cls={ourClass(race, o.kart)} />
       <span className={o.wait > 0.5 ? 'text-hot' : 'text-muted-foreground'}>{o.wait > 0.5 ? t.waitS(Math.round(o.wait)) : t.noWait}</span>
       {penalty > 0 && <span className="text-hot">· {t.penaltyS(penalty)}</span>}
-    </>
+    </span>
   )
 
-  let ours: ReactNode
-  if (race.flag) ours = <span className="text-muted-foreground">{t.boxClosed}</span>
-  else if (done) ours = <span className="text-muted-foreground">{t.allStopsDone}</span>
+  // the branches of a stop now: condition on the left, what we get on the right
+  let branches: [ReactNode, ReactNode, boolean][] = []
+  let note: ReactNode = null
+  if (race.flag) note = t.boxClosed
+  else if (done) note = t.allStopsDone
   else if (me.mode === 'laneIn' || me.mode === 'wait') {
-    ours = (
-      <>
-        <Row>{t.youTake} <Kart label={label(first)} cls={ourClass(race, first)} /></Row>
-        {red && <Row className="text-hot">{t.waitingForGreen(Math.ceil(race.greenAt - race.t))}</Row>}
-      </>
-    )
-  } else if (me.mode === 'box') ours = <Row>{t.outIn(Math.max(0, Math.ceil(me.laneT1 - race.t)))}</Row>
-  else if (me.mode === 'laneOut') ours = <span className="text-muted-foreground">{t.rejoining}</span>
-  else if (!rival && ifOut) {
-    ours = (
-      <>
-        <Row>{t.youGet} {outcome(ifOut)}</Row>
-        {ifOut.ahead && <Row className="text-muted-foreground short:hidden">{t.outBehind(driverName(t, ifOut.ahead.d))}</Row>}
-      </>
-    )
-  } else if (rival && ifOut) {
-    const firm = rival.hard
-    const goesIn = (
-      <Row className={firm ? '' : 'text-muted-foreground'}>
-        {t.ifGoesIn} <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-label="→" />
-        {race.intent === 'box' && ifIn ? outcome(ifIn) : <span>{t.youStayOut}</span>}
-      </Row>
-    )
-    const staysOut = (
-      <Row className={firm ? 'text-muted-foreground' : ''}>
-        {t.ifStaysOut(driverName(t, rival.d))} <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-label="→" /> {outcome(ifOut)}
-      </Row>
-    )
-    // the likelier branch first
-    ours = firm ? <>{goesIn}{staysOut}</> : <>{staysOut}{goesIn}</>
+    branches = [[t.youTake, <span key="take" className="flex items-center gap-2"><Kart label={label(first)} cls={ourClass(race, first)} />
+      {red && <span className="text-hot">{t.waitingForGreen(Math.ceil(race.greenAt - race.t))}</span>}</span>, true]]
+  } else if (me.mode === 'box') note = t.outIn(Math.max(0, Math.ceil(me.laneT1 - race.t)))
+  else if (me.mode === 'laneOut') note = t.rejoining
+  else if (ifOut && !rival) {
+    branches = [[t.youGet, result(ifOut), true]]
+    if (ifOut.ahead) branches.push([t.outBehind('').trim(), <span key="behind">{driverName(t, ifOut.ahead.d)}</span>, false])
+  } else if (ifOut && rival) {
+    const name = driverName(t, rival.d)
+    const goes: [ReactNode, ReactNode, boolean] = [t.goesInN(name), race.intent === 'box' && ifIn ? result(ifIn) : <span key="stay">{t.youStayOut}</span>, rival.hard]
+    const stays: [ReactNode, ReactNode, boolean] = [t.staysOut(name), result(ifOut), !rival.hard]
+    branches = rival.hard ? [goes, stays] : [stays, goes]
   }
 
   return (
-    <Panel className="flex min-h-0 flex-1 flex-col p-4">
+    <Panel className="flex min-h-0 flex-1 flex-col justify-between gap-4 p-4 short:gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium">{t.box}</h2>
         <span className={cn('flex items-center gap-2 text-sm tnum', red ? 'text-hot' : 'text-muted-foreground')}>
@@ -347,44 +325,60 @@ function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) =
         </span>
       </div>
 
-      {/* (a) the box and what it means for us */}
-      <div className="mt-3 flex items-start gap-4 short:mt-2">
-        <div className="flex shrink-0 items-start gap-2.5">
-          <div className="grid justify-items-center gap-1.5">
-            <Kart size="xl" label={label(first)} cls={ourClass(race, first)} onClick={() => rerate(first)} className="short:size-9 short:text-base" />
-            <span className="caption short:hidden">{t.next}</span>
-          </div>
-          <div className="grid justify-items-center gap-1.5 pt-2 short:pt-0.5">
-            <Kart size="lg" label={label(second)} cls={ourClass(race, second)} onClick={() => rerate(second)} />
-            <span className="caption short:hidden">{t.then}</span>
-          </div>
+      {/* the box as the lane holds it: same size, first on the left */}
+      <section>
+        <h3 className="caption">{t.inTheBox}</h3>
+        <div className="mt-2 flex items-center gap-6">
+          {[[first, t.first], [second, t.second]].map(([k, name]) => (
+            <span key={name as string} className="flex items-center gap-2.5 text-sm text-muted-foreground">
+              <Kart size="lg" label={label(k as number)} cls={ourClass(race, k as number)} onClick={() => rerate(k as number)} />
+              {name}
+            </span>
+          ))}
         </div>
-        <div className="grid min-w-0 flex-1 content-start gap-1.5 pt-1 text-sm tnum">{ours}</div>
-      </div>
+      </section>
 
-      {/* (b) the rivals that decide it */}
+      {/* the queue to the entry: whoever gets there first takes the first kart */}
       {!race.flag && !done && (
-        <div className="mt-5 short:mt-3">
-          <h3 className="caption">{locked ? t.nextToTake : t.atEntryBefore}</h3>
-          <ul className="mt-2 grid content-start gap-1.5 text-sm tnum">
-            {before.length === 0 ? (
-              <li className="text-muted-foreground">{nobodyCan ? t.nobodyCanStopFor(t.laps(lockedFor)) : t.nobodyElseWants}</li>
-            ) : before.slice(0, 2).map((c, j) => (
-              <li key={c.d.id} className={cn('flex items-center gap-2', j === 1 && 'short:hidden')}>
-                <span className="min-w-0 flex-1 truncate">{driverName(t, c.d)}</span>
-                <Kart label={label(c.d.kart)} cls={ourClass(race, c.d.kart)} />
-                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-label="→" />
-                <Kart label={label(first)} cls={ourClass(race, first)} />
-                <span className="shrink-0 text-right whitespace-nowrap text-muted-foreground">
-                  <span className={c.hard ? 'text-foreground' : ''}>{c.hard ? t.goesIn : t.mayGoIn}</span> · {c.tEntry.toFixed(1)} {t.s}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <section>
+          <h3 className="caption">{t.toTheEntry}</h3>
+          {locked || nobodyCan ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {before.length > 0 ? before.map((c) => `${driverName(t, c.d)} · ${c.tEntry.toFixed(1)} ${t.s}`).join(', ')
+                : nobodyCan ? t.nobodyCanStopFor(t.laps(lockedFor)) : t.nobodyAhead}
+            </p>
+          ) : (
+            <ol className="mt-2 grid grid-cols-[3.25rem_auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 text-sm tnum">
+              {[...before.map((c) => ({ id: c.d.id, x: c.tEntry, kart: c.d.kart, name: driverName(t, c.d), note: c.hard ? t.goesIn : t.mayGoIn, us: false })),
+                { id: me.id, x: tIn, kart: me.kart, name: t.you, note: before.length ? '' : t.firstInLine, us: true }].map((m) => (
+                <li key={m.id} className={cn('contents', m.us && 'font-semibold')}>
+                  <span className="text-right font-normal text-muted-foreground">{m.x.toFixed(1)} {t.s}</span>
+                  <Kart label={label(m.kart)} cls={ourClass(race, m.kart)} />
+                  <span className="truncate">{m.name}</span>
+                  <span className="font-normal text-muted-foreground">{m.note}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
       )}
 
-      <div className="min-h-3 flex-1" />
+      {/* what a stop now gives us, branch by branch */}
+      <section className="min-h-0">
+        <h3 className="caption">{t.ifYouBox}</h3>
+        {note ? (
+          <p className="mt-2 text-sm text-muted-foreground">{note}</p>
+        ) : (
+          <dl className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 text-sm tnum">
+            {branches.map(([cond, res, likely], j) => (
+              <div key={j} className={cn('contents', !likely && 'text-muted-foreground')}>
+                <dt className="truncate">{cond}</dt>
+                <dd className="justify-self-end">{res}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </section>
 
       {!race.flag && (
         <div className="grid grid-cols-[1fr_1.45fr_1fr] gap-2" role="group" aria-label={t.orderToDriver}>
@@ -406,7 +400,7 @@ function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) =
                 disabled={locked}
                 onClick={() => command(o.value)}
                 className={cn(
-                  'relative h-14 overflow-hidden rounded-lg px-5 text-[0.9375rem] leading-tight font-semibold text-balance transition-[color,background-color,scale] duration-150 ease-out disabled:opacity-30 motion-safe:enabled:active:scale-[0.96] short:h-12',
+                  'relative h-14 overflow-hidden rounded-lg px-7 text-[0.9375rem] leading-tight font-semibold text-balance transition-[color,background-color,scale] duration-150 ease-out disabled:opacity-30 motion-safe:enabled:active:scale-[0.96] short:h-12',
                   on ? (o.value === 'stay' ? 'bg-selected text-foreground' : 'bg-foreground text-background')
                     : 'bg-secondary text-muted-foreground hover:text-foreground',
                   withDriver && !on && 'ring-1 ring-foreground ring-inset',
@@ -427,10 +421,6 @@ function BoxPanel({ race, command, rerate }: { race: Race; command: (o: Order) =
       )}
     </Panel>
   )
-}
-
-function Row({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1', className)}>{children}</div>
 }
 
 // race seconds an event stays on screen
