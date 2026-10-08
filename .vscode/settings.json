@@ -1,0 +1,6 @@
+{
+  // Картинки, вставленные в backlog.md, кладутся в backlog-images/ (не в git)
+  "markdown.copyFiles.destination": {
+    "**/backlog.md": "${documentWorkspaceFolder}/backlog-images/"
+  }
+}
