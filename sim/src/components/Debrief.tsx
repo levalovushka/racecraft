@@ -104,13 +104,19 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
                 </tr>
               </thead>
               <tbody>
-                {results(race).map((x) => (
+                {results(race).map((x, _, all) => (
                   <tr key={x.driver.id} className={cn(x.driver.isUs && 'font-semibold')} aria-current={x.driver.isUs ? 'true' : undefined}>
                     <td className={cn(TD, 'relative', x.driver.isUs && 'before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-foreground')}>{x.dsq ? 'DSQ' : x.pos}</td>
                     <th scope="row" className={cn(TD, 'text-left', x.driver.isUs ? 'font-semibold' : 'font-normal')}>{driverName(t, x.driver)}</th>
                     <td className={cn(TD, 'text-right')}>{x.laps}</td>
-                    <td className={cn(TD, 'text-right')}>{fmtTime(x.time)}</td>
-                    <td className={cn(TD, 'text-right', x.penalty > 0 && 'text-hot')}>{x.penalty ? `+${x.penalty} ${t.s}` : ''}</td>
+                    <td className={cn(TD, 'text-right whitespace-nowrap')}>
+                      {/* lapped: their own finish time, plus the laps they are down, as on a real sheet */}
+                      {all[0].laps > x.laps && <span className="mr-2 text-muted-foreground">{t.lapsDown(all[0].laps - x.laps)}</span>}
+                      {fmtTime(x.time)}
+                    </td>
+                    <td className={cn(TD, 'text-right whitespace-nowrap', (x.dsq || x.penalty > 0) && 'text-hot')}>
+                      {x.dsq ? t.dsqNote(x.driver.pitsDone, race.settings.pits) : x.penalty ? `+${x.penalty} ${t.s}` : ''}
+                    </td>
                     <td className={cn(TD, 'pl-6')}>
                       <span className="flex gap-3">
                         {stintViews(race, x.driver.id).map((s, i) => <Kart key={i} label={s.label} cls={s.trueClass} />)}
