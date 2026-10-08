@@ -432,11 +432,14 @@ export function step(r: Race, dt = P.dt) {
   }
 }
 
+// pace edge (s/lap) over the kart ahead at which a pass attempt becomes a coin flip
+export const passThreshold = (aggr: number) => 0.35 - 0.3 * aggr
+
 function passProb(r: Race, d: Driver, ahead: Driver, delta: number): number {
   const lap = raceLap(r)
   const blue = lap >= P.blueFrom && lap <= r.settings.laps - P.blueToEnd
   if (blue && d.u - ahead.u > 0.5) return 0.95 // lapped driver must let the leader through within a lap
-  let p = 1 / (1 + Math.exp(-(delta - (0.35 - 0.3 * d.aggr)) / P.passK))
+  let p = 1 / (1 + Math.exp(-(delta - passThreshold(d.aggr)) / P.passK))
   if (ahead.stints.length > 1 && ahead.lapsDone === ahead.stints[ahead.stints.length - 1].start) {
     p = Math.min(1, p + 0.25) // cold kart just out of the pit lane
   }

@@ -3,7 +3,7 @@ import { ArrowRight, Dices } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
-import type { Settings } from '@/engine/race'
+import { passThreshold, type Settings } from '@/engine/race'
 import { cn } from '@/lib/utils'
 import { CLASS, CLASS_COLOR } from '@/sim/model'
 import { Brand } from './kit'
@@ -140,7 +140,7 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
             <Ends left={t.faster} right={t.slower} />
           </Field>
 
-          <Field label={t.aggression} value={s.ourAggr.toFixed(1)}>
+          <Field label={t.aggression} value={t.attacksIfFaster(passThreshold(s.ourAggr).toFixed(2))}>
             <Slider min={0} max={1} step={0.1} value={[s.ourAggr]} onValueChange={(v) => set('ourAggr', Math.round(one(v) * 10) / 10)} aria-label={t.aggression} />
             <Ends left={t.sitsBehind} right={t.attacksAtOnce} />
           </Field>
