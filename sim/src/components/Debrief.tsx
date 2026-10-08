@@ -65,11 +65,13 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
           <Panel className="p-5">
             <h2 className="text-sm font-medium">{t.whereTime}</h2>
+            <p className="mt-1 caption text-pretty">{t.whereTimeNote}</p>
             <LossTable rows={[
               [t.loss.karts, ourLoss.karts, botLoss.karts],
               [t.loss.red, ourLoss.redWait, botLoss.redWait],
               [t.loss.traffic, ourLoss.traffic, botLoss.traffic],
               [t.loss.penalties, ourLoss.penalties, botLoss.penalties],
+              [t.loss.other, ourLoss.other, botLoss.other],
             ]} name={name} />
           </Panel>
           <Panel className="p-5">
@@ -144,16 +146,18 @@ function Result({ who, pos, dsq, laps: n, time, penalty, strong }: {
 
 const fmtS = (x: number) => `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(1)}`
 
+/** Rows come rounded to 0.1, so the total is the sum of what is shown. Minus = gained (green), plus = lost (red) */
 function LossTable({ rows, name }: { rows: [string, number, number][]; name: string }) {
   const t = useT()
   const max = Math.max(5, ...rows.flatMap(([, a, b]) => [Math.abs(a), Math.abs(b)]))
   const total = rows.reduce((t, [, a, b]) => [t[0] + a, t[1] + b], [0, 0])
+  const tone = (v: number) => (Math.abs(v) < 0.05 ? 'text-muted-foreground' : v < 0 ? 'text-ok' : 'text-hot')
   const Bar = ({ v, other }: { v: number; other?: boolean }) => (
-    <span className="flex items-center gap-2.5">
+    <span className={cn('flex items-center gap-2.5', other && 'opacity-70')}>
       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-track" aria-hidden>
-        <span className={cn('block h-full rounded-full', other ? 'bg-muted-foreground' : 'bg-foreground')} style={{ width: `${(Math.abs(v) / max) * 100}%` }} />
+        <span className={cn('block h-full rounded-full', v < 0 ? 'bg-ok' : 'bg-hot')} style={{ width: `${(Math.abs(v) / max) * 100}%` }} />
       </span>
-      <span className={cn('w-14 text-right', other && 'text-muted-foreground')}>{fmtS(v)}</span>
+      <span className={cn('w-14 text-right', tone(v))}>{fmtS(v)}</span>
     </span>
   )
   return (
@@ -175,8 +179,8 @@ function LossTable({ rows, name }: { rows: [string, number, number][]; name: str
         ))}
         <tr className="font-medium">
           <th scope="row" className="h-10 border-t text-left font-medium">{t.total}</th>
-          <td className="border-t pr-5 text-right">{fmtS(total[0])} {t.s}</td>
-          <td className="border-t text-right text-muted-foreground">{fmtS(total[1])} {t.s}</td>
+          <td className={cn('border-t pr-5 text-right', tone(total[0]))}>{fmtS(total[0])} {t.s}</td>
+          <td className={cn('border-t text-right opacity-70', tone(total[1]))}>{fmtS(total[1])} {t.s}</td>
         </tr>
       </tbody>
     </table>
