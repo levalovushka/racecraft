@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { P, type Driver, type Race } from '@/engine/race'
+import { P, type Driver, type PitRecord, type Race } from '@/engine/race'
 import { pitXY, xyOfTau } from '@/engine/track'
 import { useT } from '@/i18n'
 import { CLASS, CLASS_COLOR, CLASS_TEXT, driverXY, ourClass, parkedTargets, SHAPE, TRACK } from '@/sim/model'
@@ -31,6 +31,39 @@ function KartDot({ x, y, label, cls, us, onClick, onHover }: { x: number; y: num
       >
         {label}
       </text>
+    </g>
+  )
+}
+
+const SWAP_R = R + 13 // progress ring around the driver in the box, clear of our white ring
+
+/**
+ * The swap in progress: a ring around the driver in the box filling from the
+ * button press to his release, "handed in → taken" under the box, and the kart
+ * he handed in marked where it now stands in the queue.
+ */
+function Swap({ race, d, pit, parked }: { race: Race; d: Driver; pit: PitRecord; parked: { kart: number; f: number }[] }) {
+  const [x, y] = pitXY(TRACK, TRACK.pit.slots[0])
+  const p = Math.min(1, Math.max(0, (race.t - d.laneT0) / Math.max(0.01, d.laneT1 - d.laneT0)))
+  const c = 2 * Math.PI * SWAP_R
+  const handed = parked.find((k) => k.kart === pit.from)
+  const [hx, hy] = handed ? pitXY(TRACK, handed.f) : [0, 0]
+  const tag = (kart: number, tx: number) => (
+    <text x={tx} textAnchor="middle" fill={CLASS_COLOR[ourClass(race, kart)]} fontSize={34} fontWeight={600} style={{ fontVariantNumeric: 'tabular-nums lining-nums' }}>
+      {race.karts[kart].label}
+    </text>
+  )
+  return (
+    <g className="pointer-events-none">
+      <circle cx={x} cy={y} r={SWAP_R} fill="none" stroke="white" strokeOpacity={0.15} strokeWidth={5} />
+      <circle cx={x} cy={y} r={SWAP_R} fill="none" stroke="white" strokeWidth={5} strokeLinecap="round"
+        strokeDasharray={`${p * c} ${c}`} transform={`rotate(-90 ${x} ${y})`} />
+      {handed && <circle cx={hx} cy={hy} r={R + 6} fill="none" stroke="white" strokeWidth={3} strokeDasharray="7 6" />}
+      <g transform={`translate(${x} ${y + SWAP_R + 50})`}>
+        {tag(pit.from, -44)}
+        <text textAnchor="middle" fill="white" fillOpacity={0.6} fontSize={30}>→</text>
+        {tag(pit.to, 44)}
+      </g>
     </g>
   )
 }
@@ -100,6 +133,8 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
   const [gx, gy, gw, gh] = SHAPE.light
   const parked = useParked(race)
   const grid = useGrid(race)
+  const boxed = race.drivers.find((d) => d.mode === 'box')
+  const pit = race.pits[race.pits.length - 1]
   const [hover, setHover] = useState<number | null>(null) // kart under the pointer
   const hoverOn = (kart: number) => onKart && ((on: boolean) => setHover(on ? kart : null))
   const cars = race.drivers
@@ -145,6 +180,9 @@ export function TrackView({ race, onKart }: { race: Race; onKart?: (kart: number
           </text>
         )}
       </g>
+
+      {/* under the parked karts: the ring passes close to the next slot */}
+      {boxed && pit?.driver === boxed.id && pit.to === boxed.kart && <Swap race={race} d={boxed} pit={pit} parked={parked} />}
 
       {parked.map(({ kart, f }) => {
         const [x, y] = pitXY(TRACK, f)
