@@ -28,7 +28,7 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
   const ourLoss = lossBreakdown(race)
   const botLoss = lossBreakdown(bot.race)
   const name = driverName(t, race.drivers[0])
-  const even = Math.abs(delta) < 0.05 // shows as 0.0: anything bigger must match the «Итого» difference
+  const even = Math.abs(delta) < 0.5 // too close to call: said in words, the number still matches the «Итого» difference
 
   return (
     <div className="min-h-screen">
@@ -49,7 +49,7 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
           <Panel className="p-7">
             <h2 className="caption">{t.againstBot}</h2>
             <div className={cn('mt-3 text-hero font-semibold tnum', even ? 'text-foreground' : delta < 0 ? 'text-ok' : 'text-hot')}>
-              {even ? '±0' : fmtS(delta)}
+              {fmtS(Math.round(delta * 10) / 10 || 0)}
               <span className="ml-2 text-2xl font-medium text-muted-foreground">{t.s}</span>
             </div>
             <p className="mt-4 max-w-[30rem] text-sm text-pretty text-muted-foreground">

@@ -291,7 +291,7 @@ function ForecastPanel({ race }: { race: Race }) {
 
   const rows: ReactNode[] = goers.map((g) => (
     <li key={g.d.id} className={cn('contents', !g.lane && g.t > soon && 'text-muted-foreground')}>
-      <span className="text-right text-muted-foreground" title={t.whenHint}>
+      <span className="text-right whitespace-nowrap text-muted-foreground" title={t.whenHint}>
         {g.lane ? t.nowShort : g.t < soon ? `${Math.round(g.t)} ${t.s}` : t.inLaps(Math.round(g.t / soon))}
       </span>
       <Kart label={label(g.d.kart)} cls={ourClass(race, g.d.kart)} />
@@ -326,7 +326,7 @@ function ForecastPanel({ race }: { race: Race }) {
         <p className="text-sm text-muted-foreground">{race.flag ? t.boxClosed : t.noStopsLeft}</p>
       ) : (
         // the list runs on below the fold: fade it out rather than cut a row in half
-        <ol className="grid min-h-0 flex-1 auto-rows-min grid-cols-[4rem_auto_minmax(0,1fr)_auto_auto_4rem] items-center gap-x-3 gap-y-2 overflow-hidden text-sm tnum [mask-image:linear-gradient(to_bottom,black_calc(100%-2.5rem),transparent)]" aria-label={t.forecastAria}>
+        <ol className="grid min-h-0 flex-1 auto-rows-min grid-cols-[5.25rem_auto_minmax(0,1fr)_auto_auto_4rem] items-center gap-x-3 gap-y-2 overflow-hidden text-sm tnum [mask-image:linear-gradient(to_bottom,black_calc(100%-2.5rem),transparent)]" aria-label={t.forecastAria}>
           {rows}
         </ol>
       )}
