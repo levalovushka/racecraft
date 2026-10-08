@@ -136,8 +136,8 @@ export function Setup({ initial, onStart }: { initial: Settings; onStart: (s: Se
           </Field>
 
           <Field label={t.pace} value={pace === 0 ? t.paceAverage : `${pace < 0 ? '−' : '+'}${Math.abs(pace).toFixed(2)} ${t.perLap}`}>
-            <Slider min={-0.4} max={0.4} step={0.05} value={[pace]} onValueChange={(v) => set('ourPace', Math.round(one(v) * 100) / 100)} aria-label={t.pace} />
-            <Ends left={t.faster} right={t.slower} />
+            <Slider min={-0.4} max={0.4} step={0.05} value={[-pace]} onValueChange={(v) => set('ourPace', -Math.round(one(v) * 100) / 100 || 0)} aria-label={t.pace} />
+            <Ends left={t.slower} right={t.faster} />
           </Field>
 
           <Field label={t.aggression} value={s.ourAggr.toFixed(1)}>
