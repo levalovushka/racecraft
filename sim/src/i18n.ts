@@ -90,9 +90,9 @@ const en = {
   maybeHint: 'Only one class better — he may stay out',
   burningHint: 'Must pit within the next laps or break the stint rules',
   deadlineHint: 'Must pit by his last allowed lap',
-  whenHint: 'now = already in the pit lane; N s — this lap; +N laps — in N laps',
+  whenHint: 'now = already in the pit lane; N s — this lap; in N laps — that many laps from now',
   nowShort: 'now',
-  inLaps: (n: number) => `+${n} ${n === 1 ? 'lap' : 'laps'}`,
+  inLaps: (n: number) => `in ${n} ${n === 1 ? 'lap' : 'laps'}`,
   deadline: 'deadline',
   ifStaysOutN: (n: string) => `if ${n} stays out`,
   ifNobodyGoesIn: 'if nobody goes in ahead',
@@ -140,6 +140,11 @@ const en = {
   event: {
     passedYou: (n: string) => `${n} passed you`,
     youPassed: (n: string) => `You passed ${n}`,
+    // a pass on track that leaves the race order as it was: the other car is a lap down or up
+    youLapped: (n: string) => `Lapped ${n}`,
+    youPassedLapUp: (n: string) => `Passed ${n} on track — a lap ahead`,
+    lappedYou: (n: string) => `${n} lapped you`,
+    passedYouLapDown: (n: string) => `${n} passed you on track — a lap behind`,
     skip: 'Someone went in ahead — staying out',
     flag: (n: string) => `Chequered flag: ${n}`,
     inLane: 'You are in the pit lane',
@@ -158,7 +163,9 @@ const en = {
   bot: 'Bot',
   penaltyNote: (p: number) => `+${p} s penalty`,
   whereTime: 'Where the time went',
-  loss: { karts: 'Karts', red: 'Under red', traffic: 'Traffic', penalties: 'Penalties' },
+  whereTimeNote: 'Seconds against a clean race on a median kart with the mandatory stops and no traffic; minus = gained.',
+  loss: { karts: 'Karts', red: 'Under red', traffic: 'Traffic', penalties: 'Penalties', other: 'Other' },
+  otherNote: (dsq: boolean) => `Other: lap-time noise, overtakes and defending, warm-up, release from the box, missing laps counted at a reference lap${dsq ? ', and the skipped mandatory stops (time saved, the DSQ is under Penalties)' : ''}.`,
   total: 'Total',
   stints: 'Stints',
   trueClasses: 'true classes',
@@ -166,12 +173,17 @@ const en = {
   youRatedIt: 'you rated it',
   classification: 'Classification',
   resultCols: { pos: 'Pos', driver: 'Driver', laps: 'Laps', time: 'Time', penalty: 'Penalty', karts: 'Karts' },
+  lapsDown: (n: number) => `+${n} ${PLURAL.en.select(n) === 'one' ? 'lap' : 'laps'}`,
+  dsqNote: (done: number, need: number) => `DSQ · ${done} of ${need} stops`,
   calls: 'Calls',
-  evaluating: (a: number, b: number) => `Evaluating ${a} of ${b}`,
+  evaluating: (pct: number) => `Evaluating ${pct}%`,
   evaluatingOne: 'Evaluating',
-  callsNote: 'Each call against the other one: 24 race continuations, then the bot drives',
+  evalFailed: "Couldn't evaluate",
+  evalAllFailed: "Couldn't evaluate the calls: the calculation failed",
+  callsNote: 'Each call against the other one: 24 race continuations, then the bot drives; minus = gained',
   nothingToReview: 'Nothing to review: the box never had a better kart and you never stopped.',
   callCols: { lap: 'Lap', situation: 'Situation', kart: 'Kart', red: 'Red', margin: 'Margin', call: 'Call', verdict: 'Verdict' },
+  marginLate: (n: number) => `${n} ${PLURAL.en.select(n) === 'one' ? 'lap' : 'laps'} late`,
   kind: { pit: 'Stopped', hungry: 'Upgrade in box', burning: 'Burning' },
   callText: { box: 'Box', stay: 'Stay out', clearIn: 'Box if clear → stopped', clearOut: 'Box if clear → stayed out' },
   noDifference: 'No difference',
@@ -257,9 +269,9 @@ const ru: Dict = {
   maybeHint: 'Выгода всего один класс — может и не заехать',
   burningHint: 'Должен заехать в ближайшие круги, иначе нарушит правила стинта',
   deadlineHint: 'Обязан заехать до своего последнего допустимого круга',
-  whenHint: 'сейчас = уже в пит-лейне; N с — в этом круге; +N кр — через N кругов',
+  whenHint: 'сейчас = уже в пит-лейне; N с — в этом круге; через N кр — через N кругов',
   nowShort: 'сейчас',
-  inLaps: (n) => `+${n} кр`,
+  inLaps: (n) => `через ${n} кр`,
   deadline: 'дедлайн',
   ifStaysOutN: (n) => `если ${n} проедет`,
   ifNobodyGoesIn: 'если никто не заедет',
@@ -305,6 +317,10 @@ const ru: Dict = {
   event: {
     passedYou: (n) => `${n} обогнал вас`,
     youPassed: (n) => `Вы обогнали: ${n}`,
+    youLapped: (n) => `Обогнали кругового: ${n}`,
+    youPassedLapUp: (n) => `Обогнали на трассе: ${n} — он на круг впереди`,
+    lappedYou: (n) => `${n} обогнал вас на круг`,
+    passedYouLapDown: (n) => `${n} обогнал вас на трассе — он на круг позади`,
     skip: 'Перед вами заехали — остаёмся',
     flag: (n) => `Финиш: ${n}`,
     inLane: 'Вы в пит-лейне',
@@ -322,7 +338,9 @@ const ru: Dict = {
   bot: 'Бот',
   penaltyNote: (p) => `+${p} с штрафа`,
   whereTime: 'Куда ушло время',
-  loss: { karts: 'Карты', red: 'Под красным', traffic: 'Трафик', penalties: 'Штрафы' },
+  whereTimeNote: 'Секунды против чистой гонки на медианном карте с обязательными питами и без трафика; минус — выиграно.',
+  loss: { karts: 'Карты', red: 'Под красным', traffic: 'Трафик', penalties: 'Штрафы', other: 'Прочее' },
+  otherNote: (dsq) => `Прочее: шум времени круга, обгоны и защита, прогрев, выпуск из бокса, недостающие круги по эталонному кругу${dsq ? ', а также пропущенные обязательные питы (сэкономленное время, DSQ — в «Штрафах»)' : ''}.`,
   total: 'Итого',
   stints: 'Стинты',
   trueClasses: 'истинные классы',
@@ -330,12 +348,17 @@ const ru: Dict = {
   youRatedIt: 'вы оценили как',
   classification: 'Протокол',
   resultCols: { pos: 'Поз.', driver: 'Пилот', laps: 'Круги', time: 'Время', penalty: 'Штраф', karts: 'Карты' },
+  lapsDown: (n) => `+${n} кр.`,
+  dsqNote: (done, need) => `DSQ · питов ${done} из ${need}`,
   calls: 'Решения',
-  evaluating: (a, b) => `Оценка ${a} из ${b}`,
+  evaluating: (pct) => `Оценка ${pct}%`,
   evaluatingOne: 'Оценка',
-  callsNote: 'Каждое решение против другого: 24 продолжения гонки, дальше за вас едет бот',
+  evalFailed: 'Не удалось оценить',
+  evalAllFailed: 'Не удалось оценить решения: расчёт упал',
+  callsNote: 'Каждое решение против другого: 24 продолжения гонки, дальше за вас едет бот; минус — выиграно',
   nothingToReview: 'Нечего разбирать: в боксе не было карта лучше вашего, и вы не заезжали.',
   callCols: { lap: 'Круг', situation: 'Ситуация', kart: 'Карт', red: 'Красный', margin: 'Запас', call: 'Решение', verdict: 'Оценка' },
+  marginLate: (n) => `опоздание ${n} кр.`,
   kind: { pit: 'Заехали', hungry: 'Апгрейд в боксе', burning: 'Горели' },
   callText: { box: 'Бокс', stay: 'Мимо', clearIn: 'Бокс, если чисто → заехали', clearOut: 'Бокс, если чисто → проехали' },
   noDifference: 'Разницы нет',
@@ -372,7 +395,11 @@ export function driverName(t: Dict, d: Driver): string {
 export function eventText(t: Dict, r: Race, it: LogItem): string {
   const who = it.driver !== undefined ? driverName(t, r.drivers[it.driver]) : ''
   switch (it.kind) {
-    case 'overtake': return it.ourGain ? t.event.youPassed(who) : t.event.passedYou(who)
+    case 'overtake': {
+      const k = Math.sign(it.lapDiff ?? 0) // the other car's laps against ours
+      if (it.ourGain) return k < 0 ? t.event.youLapped(who) : k > 0 ? t.event.youPassedLapUp(who) : t.event.youPassed(who)
+      return k > 0 ? t.event.lappedYou(who) : k < 0 ? t.event.passedYouLapDown(who) : t.event.passedYou(who)
+    }
     case 'skip': return t.event.skip
     case 'flag': return t.event.flag(who)
     case 'pit': return t.event.inLane

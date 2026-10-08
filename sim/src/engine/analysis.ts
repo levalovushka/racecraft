@@ -43,8 +43,9 @@ export interface DecisionValue {
   stay: OptionValue
 }
 
-/** Monte Carlo from the decision point: both options, our driver then played by the bot */
-export function evaluateDecision(dec: Decision, n = 24): DecisionValue {
+/** Monte Carlo from the decision point: both options, our driver then played by the bot; onRun ticks after every continuation */
+export function evaluateDecision(dec: Decision, n = 24, onRun?: (done: number, of: number) => void): DecisionValue {
+  let done = 0
   const run = (commit: boolean): OptionValue => {
     const xs: number[] = []
     let pos = 0
@@ -59,6 +60,7 @@ export function evaluateDecision(dec: Decision, n = 24): DecisionValue {
       const o = ourOutcome(c)
       xs.push(score(o, c))
       pos += o.pos
+      onRun?.(++done, 2 * n)
     }
     const mean = xs.reduce((a, b) => a + b, 0) / n
     const sd = Math.sqrt(xs.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, n - 1))
@@ -120,13 +122,28 @@ export function stintViews(r: Race, driverId = 0): StintView[] {
   })
 }
 
+const round1 = (x: number) => Math.round(x * 10) / 10
+
+/**
+ * Where the time went, s, against a clean race that depends only on the settings and the grid slot,
+ * so it is the same for the driver and for the bot: median kart, no traffic, no red, the mandatory pits.
+ * Rows come rounded to 0.1 and `other` takes the rest and the rounding, so the rows add up to the shown total
+ * and the difference of two totals is the difference of the race scores (±0.1).
+ */
 export function lossBreakdown(r: Race, driverId = 0) {
   const d = r.drivers[driverId]
-  const karts = stintViews(r, driverId).reduce((a, s) => a + s.cost, 0)
-  return {
-    karts,
-    redWait: d.redWait,
-    traffic: d.trafficLoss,
-    penalties: penalties(r, d),
+  const s = r.settings
+  const row = results(r).find((x) => x.driver.id === driverId)!
+  const real = score({ total: row.total, pos: row.pos, laps: row.laps, dsq: row.dsq }, r)
+  const gridU = createRace(s, r.track).drivers[driverId].u // <= 0: the grid slot sits behind the line
+  const clean = (s.laps - gridU) * (r.track.refLap + d.pace) + P.startLoss + s.pits * s.pitLoss
+  const named = {
+    karts: round1(stintViews(r, driverId).reduce((a, x) => a + x.cost, 0)),
+    redWait: round1(d.redWait),
+    traffic: round1(d.trafficLoss),
+    penalties: round1(penalties(r, d) + (row.dsq ? 600 : 0)), // short stints and, like score(), DSQ for missed stops
   }
+  const shown = Object.values(named).reduce((a, x) => a + x, 0)
+  // lap noise, passes and defending, warm-up, release from the box; a lapped driver's missing laps at refLap
+  return { ...named, other: round1(round1(real - clean) - shown) }
 }

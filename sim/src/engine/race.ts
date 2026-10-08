@@ -142,6 +142,7 @@ export interface LogItem {
   driver?: number // who the event is about
   other?: number // overtake: the other driver
   ourGain?: boolean // overtake: we passed (true) or were passed (false)
+  lapDiff?: number // overtake: the other driver's laps minus ours (0: same lap, the race order changed; -1: a lapped car; +1: a lap up)
   from?: number // kart change: kart ids
   to?: number
   wait?: number // kart change: seconds under red
@@ -382,13 +383,15 @@ export function step(r: Race, dt = P.dt) {
         if (!r.attempts.has(key)) {
           r.attempts.add(key)
           if (rand(noiseKey(r, d.lapsDone), K.pass, d.id, ahead.id, d.lapsDone, zone) < passProb(r, d, ahead, delta)) {
+            // the race order only changes between drivers on the same lap: the other's laps relative to ours
+            const lapDiff = d.isUs ? Math.round(cand.get(ahead.id)! - cand.get(d.id)!) : Math.round(cand.get(d.id)! - cand.get(ahead.id)!)
             cand.set(d.id, cand.get(d.id)! + gap + 0.08 / d.lapT)
             cand.set(ahead.id, cand.get(ahead.id)! - P.passLoss / ahead.lapT)
             d.overtakes++
             if (d.isUs || ahead.isUs) {
               const other = d.isUs ? ahead : d
               log(r, d.isUs ? `You passed ${other.name}` : `${other.name} passed you`, true,
-                { kind: 'overtake', driver: other.id, ourGain: d.isUs })
+                { kind: 'overtake', driver: other.id, ourGain: d.isUs, lapDiff })
             }
             continue
           }
@@ -606,19 +609,33 @@ export function results(r: Race): Result[] {
   return rows
 }
 
-/** Running order: by distance covered; drivers in the pit lane keep the distance they had at entry */
+/**
+ * Laps covered, for display. In the pit lane the driver slides from the entry
+ * point to the exit point over the shortest possible lane time and waits there
+ * if the stop takes longer: far slower than anyone on track, so whoever passes
+ * him meanwhile does it once and stays ahead. After the flag, the laps finished with.
+ */
+export function distance(r: Race, d: Driver): number {
+  if (d.mode === 'done') return d.lapsDone
+  if (d.mode === 'track') return d.u
+  const tEnter = laneEntry(r, d)
+  const shortest = P.toBox + r.settings.stopTime + r.fromBox // the release margin only adds to it
+  const { tauPitIn, tauPitOut } = r.track
+  return Math.floor(d.u) + tauPitIn + Math.min(1, (r.t - tEnter) / shortest) * (tauPitOut - tauPitIn)
+}
+
+/** When a driver in the pit lane entered it */
+function laneEntry(r: Race, d: Driver): number {
+  if (d.mode === 'laneIn') return d.laneT0
+  if (d.mode === 'wait') return d.laneT0 - P.toBox
+  return r.pits.filter((p) => p.driver === d.id).at(-1)!.tEnter
+}
+
+/** Running order: by distance covered; finishers on the same lap by who crossed first, the lane (first come, first out) by entry */
 export function order(r: Race): Driver[] {
-  return r.drivers.slice().sort((a, b) => {
-    if (a.mode === 'done' && b.mode === 'done') return (a.finishTime ?? 0) - (b.finishTime ?? 0)
-    if (a.mode === 'done' || b.mode === 'done') {
-      // finished drivers ahead of those who still run the same lap count
-      const la = a.lapsDone
-      const lb = b.lapsDone
-      if (la !== lb) return lb - la
-      return a.mode === 'done' ? -1 : 1
-    }
-    return b.u - a.u
-  })
+  const entry = (d: Driver) => (inLane(d) ? laneEntry(r, d) : 0)
+  return r.drivers.slice().sort((a, b) => distance(r, b) - distance(r, a) ||
+    (a.finishTime ?? r.t) - (b.finishTime ?? r.t) || entry(a) - entry(b))
 }
 
 export function runToEnd(r: Race, dt = P.dt) {

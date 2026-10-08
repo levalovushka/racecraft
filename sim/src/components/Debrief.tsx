@@ -23,12 +23,12 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
   const botRow = results(bot.race).find((x) => x.driver.isUs)!
   const ourScore = score({ total: ours.total, pos: ours.pos, laps: ours.laps, dsq: ours.dsq }, race)
   const botScore = score(bot.outcome, bot.race)
-  const delta = botScore - ourScore // > 0: we beat the bot
+  const delta = ourScore - botScore // minus = we beat the bot, as in «Куда ушло время»
   const decisions = useMemo(() => interestingDecisions(race), [race])
   const ourLoss = lossBreakdown(race)
   const botLoss = lossBreakdown(bot.race)
   const name = driverName(t, race.drivers[0])
-  const even = Math.abs(delta) < 0.5
+  const even = Math.abs(delta) < 0.5 // too close to call: said in words, the number still matches the «Итого» difference
 
   return (
     <div className="min-h-screen">
@@ -48,12 +48,12 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
           <Panel className="p-7">
             <h2 className="caption">{t.againstBot}</h2>
-            <div className={cn('mt-3 text-hero font-semibold tnum', even ? 'text-foreground' : delta > 0 ? 'text-ok' : 'text-hot')}>
-              {even ? '±0' : fmtS(delta)}
+            <div className={cn('mt-3 text-hero font-semibold tnum', even ? 'text-foreground' : delta < 0 ? 'text-ok' : 'text-hot')}>
+              {fmtS(Math.round(delta * 10) / 10 || 0)}
               <span className="ml-2 text-2xl font-medium text-muted-foreground">{t.s}</span>
             </div>
             <p className="mt-4 max-w-[30rem] text-sm text-pretty text-muted-foreground">
-              {even ? t.level : delta > 0 ? t.beat : t.worse}{' '}{t.sameKarts}
+              {even ? t.level : delta < 0 ? t.beat : t.worse}{' '}{t.sameKarts}
             </p>
           </Panel>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
@@ -65,12 +65,15 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
           <Panel className="p-5">
             <h2 className="text-sm font-medium">{t.whereTime}</h2>
+            <p className="mt-1 caption text-pretty">{t.whereTimeNote}</p>
             <LossTable rows={[
               [t.loss.karts, ourLoss.karts, botLoss.karts],
               [t.loss.red, ourLoss.redWait, botLoss.redWait],
               [t.loss.traffic, ourLoss.traffic, botLoss.traffic],
               [t.loss.penalties, ourLoss.penalties, botLoss.penalties],
+              [t.loss.other, ourLoss.other, botLoss.other],
             ]} name={name} />
+            <p className="mt-3 caption text-pretty">{t.otherNote(ours.dsq || bot.outcome.dsq)}</p>
           </Panel>
           <Panel className="p-5">
             <div className="flex items-baseline justify-between gap-4">
@@ -101,13 +104,19 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
                 </tr>
               </thead>
               <tbody>
-                {results(race).map((x) => (
+                {results(race).map((x, _, all) => (
                   <tr key={x.driver.id} className={cn(x.driver.isUs && 'font-semibold')} aria-current={x.driver.isUs ? 'true' : undefined}>
                     <td className={cn(TD, 'relative', x.driver.isUs && 'before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-foreground')}>{x.dsq ? 'DSQ' : x.pos}</td>
                     <th scope="row" className={cn(TD, 'text-left', x.driver.isUs ? 'font-semibold' : 'font-normal')}>{driverName(t, x.driver)}</th>
                     <td className={cn(TD, 'text-right')}>{x.laps}</td>
-                    <td className={cn(TD, 'text-right')}>{fmtTime(x.time)}</td>
-                    <td className={cn(TD, 'text-right', x.penalty > 0 && 'text-hot')}>{x.penalty ? `+${x.penalty} ${t.s}` : ''}</td>
+                    <td className={cn(TD, 'text-right whitespace-nowrap')}>
+                      {/* lapped: their own finish time, plus the laps they are down, as on a real sheet */}
+                      {all[0].laps > x.laps && <span className="mr-2 text-muted-foreground">{t.lapsDown(all[0].laps - x.laps)}</span>}
+                      {fmtTime(x.time)}
+                    </td>
+                    <td className={cn(TD, 'text-right whitespace-nowrap', (x.dsq || x.penalty > 0) && 'text-hot')}>
+                      {x.dsq ? t.dsqNote(x.driver.pitsDone, race.settings.pits) : x.penalty ? `+${x.penalty} ${t.s}` : ''}
+                    </td>
                     <td className={cn(TD, 'pl-6')}>
                       <span className="flex gap-3">
                         {stintViews(race, x.driver.id).map((s, i) => <Kart key={i} label={s.label} cls={s.trueClass} />)}
@@ -144,16 +153,19 @@ function Result({ who, pos, dsq, laps: n, time, penalty, strong }: {
 
 const fmtS = (x: number) => `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(1)}`
 
+/** Rows come rounded to 0.1, so the total is the sum of what is shown. Minus = gained (green), plus = lost (red) */
 function LossTable({ rows, name }: { rows: [string, number, number][]; name: string }) {
   const t = useT()
   const max = Math.max(5, ...rows.flatMap(([, a, b]) => [Math.abs(a), Math.abs(b)]))
-  const total = rows.reduce((t, [, a, b]) => [t[0] + a, t[1] + b], [0, 0])
+  // float sums of 0.1 steps drift (−0.1 − 0.2 + 0.3 = −5.6e-17 → «−0.0»): snap back to the 0.1 grid
+  const total = rows.reduce((t, [, a, b]) => [t[0] + a, t[1] + b], [0, 0]).map((x) => Math.round(x * 10) / 10 || 0)
+  const tone = (v: number) => (Math.abs(v) < 0.05 ? 'text-muted-foreground' : v < 0 ? 'text-ok' : 'text-hot')
   const Bar = ({ v, other }: { v: number; other?: boolean }) => (
-    <span className="flex items-center gap-2.5">
+    <span className={cn('flex items-center gap-2.5', other && 'opacity-70')}>
       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-track" aria-hidden>
-        <span className={cn('block h-full rounded-full', other ? 'bg-muted-foreground' : 'bg-foreground')} style={{ width: `${(Math.abs(v) / max) * 100}%` }} />
+        <span className={cn('block h-full rounded-full', v < 0 ? 'bg-ok' : 'bg-hot')} style={{ width: `${(Math.abs(v) / max) * 100}%` }} />
       </span>
-      <span className={cn('w-14 text-right', other && 'text-muted-foreground')}>{fmtS(v)}</span>
+      <span className={cn('w-14 text-right', tone(v))}>{fmtS(v)}</span>
     </span>
   )
   return (
@@ -175,8 +187,8 @@ function LossTable({ rows, name }: { rows: [string, number, number][]; name: str
         ))}
         <tr className="font-medium">
           <th scope="row" className="h-10 border-t text-left font-medium">{t.total}</th>
-          <td className="border-t pr-5 text-right">{fmtS(total[0])} {t.s}</td>
-          <td className="border-t text-right text-muted-foreground">{fmtS(total[1])} {t.s}</td>
+          <td className={cn('border-t pr-5 text-right', tone(total[0]))}>{fmtS(total[0])} {t.s}</td>
+          <td className={cn('border-t text-right opacity-70', tone(total[1]))}>{fmtS(total[1])} {t.s}</td>
         </tr>
       </tbody>
     </table>
@@ -229,26 +241,55 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
     }
     return { decisions: out, until }
   }, [all])
-  const [values, setValues] = useState<Record<number, DecisionValue>>({})
+  const [values, setValues] = useState<Record<number, DecisionValue | 'failed'>>({})
+  const [progress, setProgress] = useState<Record<number, number>>({}) // 0..1 per decision
   useEffect(() => {
-    if (decisions.length === 0) return
-    const w = new Worker(new URL('../sim/evalWorker.ts', import.meta.url), { type: 'module' })
-    w.onmessage = (e: MessageEvent<{ id: number; value: DecisionValue }>) => {
-      setValues((v) => ({ ...v, [e.data.id]: e.data.value }))
+    // one worker per decision, at most cores − 1 at once
+    const queue = [...decisions]
+    const live = new Set<Worker>()
+    let stopped = false
+    const next = () => {
+      const v = queue.shift()
+      if (!v) return
+      const w = new Worker(new URL('../sim/evalWorker.ts', import.meta.url), { type: 'module' })
+      live.add(w)
+      let settled = false
+      const finish = (val: DecisionValue | 'failed') => {
+        if (settled) return // onerror and onmessageerror can both fire
+        settled = true
+        w.terminate()
+        live.delete(w)
+        if (stopped) return
+        setValues((x) => ({ ...x, [v.index]: val }))
+        next()
+      }
+      w.onmessage = (e: MessageEvent<{ id: number; value?: DecisionValue; progress?: { done: number; of: number } }>) => {
+        if (stopped) return
+        const { value, progress: p } = e.data
+        if (value) finish(value)
+        else if (p) setProgress((x) => ({ ...x, [v.index]: p.done / p.of }))
+      }
+      w.onerror = w.onmessageerror = () => finish('failed')
+      w.postMessage({ id: v.index, dec: v.dec, n: 24 })
     }
-    for (const v of decisions) w.postMessage({ id: v.index, dec: v.dec, n: 24 })
-    return () => w.terminate()
+    const slots = Math.max(1, (navigator.hardwareConcurrency || 2) - 1)
+    for (let i = 0; i < slots; i++) next()
+    return () => {
+      stopped = true
+      for (const w of live) w.terminate()
+    }
   }, [decisions])
-  const done = decisions.filter((v) => values[v.index]).length
+  const pending = decisions.filter((v) => !values[v.index]).length
+  const pct = Math.floor(100 * decisions.reduce((a, v) => a + (values[v.index] ? 1 : progress[v.index] ?? 0), 0) / Math.max(1, decisions.length))
 
   return (
     <Panel className="p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-sm font-medium">{t.calls}</h2>
         <span className="caption" role="status">
-          {done < decisions.length
-            ? <span className="flex items-center gap-1.5"><Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden /> {t.evaluating(done, decisions.length)}</span>
-            : t.callsNote}
+          {pending > 0
+            ? <span className="flex items-center gap-1.5"><Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden /> {t.evaluating(pct)}</span>
+            : decisions.length > 0 && decisions.every((v) => values[v.index] === 'failed') ? t.evalAllFailed : t.callsNote}
         </span>
       </div>
       {decisions.length === 0 ? (
@@ -285,9 +326,18 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
                       </span>
                     </td>
                     <td className={cn(TD, 'text-right whitespace-nowrap', v.wait > 0.5 ? 'text-hot' : 'text-muted-foreground')}>{v.wait > 0.5 ? `${v.wait.toFixed(0)} ${t.s}` : '—'}</td>
-                    <td className={cn(TD, 'text-right whitespace-nowrap')}>{t.laps(v.margin)}</td>
+                    {/* below zero: past the last lap that still leaves room for the remaining minimum stints */}
+                    <td className={cn(TD, 'text-right whitespace-nowrap', v.margin < 0 && 'text-hot')}>{v.margin < 0 ? t.marginLate(-v.margin) : t.laps(v.margin)}</td>
                     <td className={cn(TD, 'pl-6 font-medium')}>{orderText(t, v.dec.order, v.dec.commit)}</td>
-                    <td className={TD}>{val ? <Verdict val={val} commit={v.dec.commit} /> : <span className="block h-1.5 w-24 rounded-full bg-track motion-safe:animate-pulse" aria-label={t.evaluatingOne} />}</td>
+                    <td className={TD}>
+                      {val === 'failed' ? <span className="text-muted-foreground">{t.evalFailed}</span>
+                        : val ? <Verdict val={val} commit={v.dec.commit} />
+                        : (
+                          <span className="block h-1.5 w-24 overflow-hidden rounded-full bg-track" role="progressbar" aria-label={t.evaluatingOne} aria-valuenow={Math.round(100 * (progress[v.index] ?? 0))}>
+                            <span className="block h-full rounded-full bg-muted-foreground transition-[width]" style={{ width: `${100 * (progress[v.index] ?? 0)}%` }} />
+                          </span>
+                        )}
+                    </td>
                   </tr>
                 )
               })}
@@ -305,12 +355,12 @@ function orderText(t: Dict, order: Order, commit: boolean) {
   return commit ? t.callText.clearIn : t.callText.clearOut
 }
 
-/** Our choice against the other option: the bar spans ±10 s */
+/** Our choice against the other option, minus = our choice gained: the bar spans ±10 s, gain to the left */
 function Verdict({ val, commit }: { val: DecisionValue; commit: boolean }) {
   const t = useT()
   const chosen = commit ? val.pit : val.stay
   const other = commit ? val.stay : val.pit
-  const diff = other.mean - chosen.mean // > 0: our choice was faster
+  const diff = chosen.mean - other.mean // minus = our choice was faster
   const se = Math.sqrt(chosen.sd ** 2 / chosen.n + other.sd ** 2 / other.n)
   const even = Math.abs(diff) < Math.max(0.5, 2 * se)
   const w = Math.min(1, Math.abs(diff) / 10) * 50
@@ -319,11 +369,11 @@ function Verdict({ val, commit }: { val: DecisionValue; commit: boolean }) {
       <span className="relative h-1.5 w-24 shrink-0 rounded-full bg-track max-lg:hidden" aria-hidden>
         <span className="absolute inset-y-[-3px] left-1/2 w-px bg-muted-foreground" />
         {!even && (
-          <span className={cn('absolute inset-y-0 rounded-full', diff > 0 ? 'left-1/2 bg-ok' : 'right-1/2 bg-hot')} style={{ width: `${w}%` }} />
+          <span className={cn('absolute inset-y-0 rounded-full', diff < 0 ? 'right-1/2 bg-ok' : 'left-1/2 bg-hot')} style={{ width: `${w}%` }} />
         )}
       </span>
-      <span className={cn(even ? 'text-muted-foreground' : diff > 0 ? 'text-ok' : 'text-hot')}>
-        {even ? t.noDifference : diff > 0 ? t.rightCall(fmtS(diff)) : t.betterWas(commit, fmtS(diff))}
+      <span className={cn(even ? 'text-muted-foreground' : diff < 0 ? 'text-ok' : 'text-hot')}>
+        {even ? t.noDifference : diff < 0 ? t.rightCall(fmtS(diff)) : t.betterWas(commit, fmtS(diff))}
       </span>
     </span>
   )

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DEFAULT_SETTINGS, type Race, type Settings } from '@/engine/race'
+import { DEFAULT_SETTINGS, runToEnd, type Race, type Settings } from '@/engine/race'
 import { Setup } from '@/components/Setup'
 import { RaceScreen } from '@/components/RaceScreen'
 import { Debrief } from '@/components/Debrief'
@@ -24,7 +24,9 @@ export default function App() {
 
   if (phase.kind === 'setup') return <Setup initial={settings} onStart={start} />
   if (phase.kind === 'race') {
-    return <RaceScreen key={phase.run} settings={settings} onFinish={(race) => setPhase({ kind: 'debrief', race })} />
+    // «Разбор» opens at the flag: the rest are still on their last lap, so finish the race first —
+    // otherwise the protocol stamps them all with the clock at the click and a lap short
+    return <RaceScreen key={phase.run} settings={settings} onFinish={(race) => setPhase({ kind: 'debrief', race: runToEnd(race) })} />
   }
   return (
     <Debrief
