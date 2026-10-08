@@ -246,7 +246,10 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
       if (!v) return
       const w = new Worker(new URL('../sim/evalWorker.ts', import.meta.url), { type: 'module' })
       live.add(w)
+      let settled = false
       const finish = (val: DecisionValue | 'failed') => {
+        if (settled) return // onerror and onmessageerror can both fire
+        settled = true
         w.terminate()
         live.delete(w)
         if (stopped) return
@@ -279,7 +282,7 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
         <span className="caption" role="status">
           {pending > 0
             ? <span className="flex items-center gap-1.5"><Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden /> {t.evaluating(pct)}</span>
-            : t.callsNote}
+            : decisions.length > 0 && decisions.every((v) => values[v.index] === 'failed') ? t.evalAllFailed : t.callsNote}
         </span>
       </div>
       {decisions.length === 0 ? (
