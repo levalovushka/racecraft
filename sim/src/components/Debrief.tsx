@@ -73,6 +73,7 @@ export function Debrief({ race, onAgain, onNew }: { race: Race; onAgain: () => v
               [t.loss.penalties, ourLoss.penalties, botLoss.penalties],
               [t.loss.other, ourLoss.other, botLoss.other],
             ]} name={name} />
+            <p className="mt-3 caption text-pretty">{t.otherNote(ours.dsq || bot.outcome.dsq)}</p>
           </Panel>
           <Panel className="p-5">
             <div className="flex items-baseline justify-between gap-4">

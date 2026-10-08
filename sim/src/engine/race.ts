@@ -142,6 +142,7 @@ export interface LogItem {
   driver?: number // who the event is about
   other?: number // overtake: the other driver
   ourGain?: boolean // overtake: we passed (true) or were passed (false)
+  lapDiff?: number // overtake: the other driver's laps minus ours (0: same lap, the race order changed; -1: a lapped car; +1: a lap up)
   from?: number // kart change: kart ids
   to?: number
   wait?: number // kart change: seconds under red
@@ -382,13 +383,15 @@ export function step(r: Race, dt = P.dt) {
         if (!r.attempts.has(key)) {
           r.attempts.add(key)
           if (rand(noiseKey(r, d.lapsDone), K.pass, d.id, ahead.id, d.lapsDone, zone) < passProb(r, d, ahead, delta)) {
+            // the race order only changes between drivers on the same lap: the other's laps relative to ours
+            const lapDiff = d.isUs ? Math.round(cand.get(ahead.id)! - cand.get(d.id)!) : Math.round(cand.get(d.id)! - cand.get(ahead.id)!)
             cand.set(d.id, cand.get(d.id)! + gap + 0.08 / d.lapT)
             cand.set(ahead.id, cand.get(ahead.id)! - P.passLoss / ahead.lapT)
             d.overtakes++
             if (d.isUs || ahead.isUs) {
               const other = d.isUs ? ahead : d
               log(r, d.isUs ? `You passed ${other.name}` : `${other.name} passed you`, true,
-                { kind: 'overtake', driver: other.id, ourGain: d.isUs })
+                { kind: 'overtake', driver: other.id, ourGain: d.isUs, lapDiff })
             }
             continue
           }

@@ -140,6 +140,11 @@ const en = {
   event: {
     passedYou: (n: string) => `${n} passed you`,
     youPassed: (n: string) => `You passed ${n}`,
+    // a pass on track that leaves the race order as it was: the other car is a lap down or up
+    youLapped: (n: string) => `Lapped ${n}`,
+    youPassedLapUp: (n: string) => `Passed ${n} on track — a lap ahead`,
+    lappedYou: (n: string) => `${n} lapped you`,
+    passedYouLapDown: (n: string) => `${n} passed you on track — a lap behind`,
     skip: 'Someone went in ahead — staying out',
     flag: (n: string) => `Chequered flag: ${n}`,
     inLane: 'You are in the pit lane',
@@ -160,6 +165,7 @@ const en = {
   whereTime: 'Where the time went',
   whereTimeNote: 'Seconds against a clean race on a median kart with the mandatory stops and no traffic; minus = gained.',
   loss: { karts: 'Karts', red: 'Under red', traffic: 'Traffic', penalties: 'Penalties', other: 'Other' },
+  otherNote: (dsq: boolean) => `Other: lap-time noise, overtakes and defending, warm-up, release from the box, missing laps counted at a reference lap${dsq ? ', and the skipped mandatory stops (time saved, the DSQ is under Penalties)' : ''}.`,
   total: 'Total',
   stints: 'Stints',
   trueClasses: 'true classes',
@@ -308,6 +314,10 @@ const ru: Dict = {
   event: {
     passedYou: (n) => `${n} обогнал вас`,
     youPassed: (n) => `Вы обогнали: ${n}`,
+    youLapped: (n) => `Обогнали кругового: ${n}`,
+    youPassedLapUp: (n) => `Обогнали на трассе: ${n} — он на круг впереди`,
+    lappedYou: (n) => `${n} обогнал вас на круг`,
+    passedYouLapDown: (n) => `${n} обогнал вас на трассе — он на круг позади`,
     skip: 'Перед вами заехали — остаёмся',
     flag: (n) => `Финиш: ${n}`,
     inLane: 'Вы в пит-лейне',
@@ -327,6 +337,7 @@ const ru: Dict = {
   whereTime: 'Куда ушло время',
   whereTimeNote: 'Секунды против чистой гонки на медианном карте с обязательными питами и без трафика; минус — выиграно.',
   loss: { karts: 'Карты', red: 'Под красным', traffic: 'Трафик', penalties: 'Штрафы', other: 'Прочее' },
+  otherNote: (dsq) => `Прочее: шум времени круга, обгоны и защита, прогрев, выпуск из бокса, недостающие круги по эталонному кругу${dsq ? ', а также пропущенные обязательные питы (сэкономленное время, DSQ — в «Штрафах»)' : ''}.`,
   total: 'Итого',
   stints: 'Стинты',
   trueClasses: 'истинные классы',
@@ -378,7 +389,11 @@ export function driverName(t: Dict, d: Driver): string {
 export function eventText(t: Dict, r: Race, it: LogItem): string {
   const who = it.driver !== undefined ? driverName(t, r.drivers[it.driver]) : ''
   switch (it.kind) {
-    case 'overtake': return it.ourGain ? t.event.youPassed(who) : t.event.passedYou(who)
+    case 'overtake': {
+      const k = Math.sign(it.lapDiff ?? 0) // the other car's laps against ours
+      if (it.ourGain) return k < 0 ? t.event.youLapped(who) : k > 0 ? t.event.youPassedLapUp(who) : t.event.youPassed(who)
+      return k > 0 ? t.event.lappedYou(who) : k < 0 ? t.event.passedYouLapDown(who) : t.event.passedYou(who)
+    }
     case 'skip': return t.event.skip
     case 'flag': return t.event.flag(who)
     case 'pit': return t.event.inLane
