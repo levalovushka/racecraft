@@ -332,7 +332,7 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
                     <td className={cn(TD, 'pl-6 font-medium')}>{orderText(t, v.dec.order, v.dec.commit)}</td>
                     <td className={TD}>
                       {val === 'failed' ? <span className="text-muted-foreground">{t.evalFailed}</span>
-                        : val ? <Verdict val={val} commit={v.dec.commit} />
+                        : val ? <Verdict val={val} commit={v.dec.commit} late={v.margin < 0} />
                         : (
                           <span className="block h-1.5 w-24 overflow-hidden rounded-full bg-track" role="progressbar" aria-label={t.evaluatingOne} aria-valuenow={Math.round(100 * (progress[v.index] ?? 0))}>
                             <span className="block h-full rounded-full bg-muted-foreground transition-[width]" style={{ width: `${100 * (progress[v.index] ?? 0)}%` }} />
@@ -357,7 +357,7 @@ function orderText(t: Dict, order: Order, commit: boolean) {
 }
 
 /** Our choice against the other option, minus = our choice gained: the bar spans ±10 s, gain to the left; DSQ is named, not counted in seconds */
-function Verdict({ val, commit }: { val: DecisionValue; commit: boolean }) {
+function Verdict({ val, commit, late }: { val: DecisionValue; commit: boolean; late: boolean }) {
   const t = useT()
   const chosen = commit ? val.pit : val.stay
   const other = commit ? val.stay : val.pit
@@ -378,7 +378,8 @@ function Verdict({ val, commit }: { val: DecisionValue; commit: boolean }) {
       <span className={cn(even ? 'text-muted-foreground' : diff < 0 ? 'text-ok' : 'text-hot')}>
         {either ? t.dsqEither : even ? t.noDifference
           : byDsq ? t.dsqOther(diff < 0 ? undefined : commit)
-          : diff < 0 ? t.rightCall(fmtS(diff)) : t.betterWas(commit, fmtS(diff))}
+          // late: staying out only paid off because the bot then boxed a lap later
+          : diff < 0 ? (late && !commit ? t.rightIfLater(fmtS(diff)) : t.rightCall(fmtS(diff))) : t.betterWas(commit, fmtS(diff))}
       </span>
     </span>
   )
