@@ -228,14 +228,15 @@ function StintsRow({ title, rows, laps: total }: { title: string; rows: StintVie
 /** Every decision is evaluated in the background as soon as the debrief opens */
 function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; race: Race }) {
   const t = useT()
-  // a run of laps with the same situation and the same call is one decision: show and evaluate its first lap
+  // a run of laps with the same situation and the same call is one decision, evaluated as stayed out through its last lap;
+  // a lap under red and one without are different situations
   const { decisions, until } = useMemo(() => {
     const out: DecisionView[] = []
     const until = new Map<number, number>()
     for (const v of all) {
       const prev = out.at(-1)
       const last = prev && (until.get(prev.index) ?? prev.dec.lap)
-      if (prev && v.kind !== 'pit' && v.kind === prev.kind && v.dec.order === prev.dec.order && v.offered === prev.offered && v.dec.lap === last! + 1) {
+      if (prev && v.kind !== 'pit' && v.kind === prev.kind && v.dec.order === prev.dec.order && v.offered === prev.offered && (v.wait > 0.5) === (prev.wait > 0.5) && v.dec.lap === last! + 1) {
         until.set(prev.index, v.dec.lap)
       } else out.push(v)
     }
@@ -270,7 +271,7 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
         else if (p) setProgress((x) => ({ ...x, [v.index]: p.done / p.of }))
       }
       w.onerror = w.onmessageerror = () => finish('failed')
-      w.postMessage({ id: v.index, dec: v.dec, n: 24 })
+      w.postMessage({ id: v.index, dec: v.dec, n: 24, until: until.get(v.index) })
     }
     const slots = Math.max(1, (navigator.hardwareConcurrency || 2) - 1)
     for (let i = 0; i < slots; i++) next()
@@ -278,7 +279,7 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
       stopped = true
       for (const w of live) w.terminate()
     }
-  }, [decisions])
+  }, [decisions, until])
   const pending = decisions.filter((v) => !values[v.index]).length
   const pct = Math.floor(100 * decisions.reduce((a, v) => a + (values[v.index] ? 1 : progress[v.index] ?? 0), 0) / Math.max(1, decisions.length))
 
@@ -331,7 +332,7 @@ function DecisionsPanel({ decisions: all, race }: { decisions: DecisionView[]; r
                     <td className={cn(TD, 'pl-6 font-medium')}>{orderText(t, v.dec.order, v.dec.commit)}</td>
                     <td className={TD}>
                       {val === 'failed' ? <span className="text-muted-foreground">{t.evalFailed}</span>
-                        : val ? <Verdict val={val} commit={v.dec.commit} />
+                        : val ? <Verdict val={val} commit={v.dec.commit} late={v.margin < 0} />
                         : (
                           <span className="block h-1.5 w-24 overflow-hidden rounded-full bg-track" role="progressbar" aria-label={t.evaluatingOne} aria-valuenow={Math.round(100 * (progress[v.index] ?? 0))}>
                             <span className="block h-full rounded-full bg-muted-foreground transition-[width]" style={{ width: `${100 * (progress[v.index] ?? 0)}%` }} />
@@ -355,15 +356,17 @@ function orderText(t: Dict, order: Order, commit: boolean) {
   return commit ? t.callText.clearIn : t.callText.clearOut
 }
 
-/** Our choice against the other option, minus = our choice gained: the bar spans ±10 s, gain to the left */
-function Verdict({ val, commit }: { val: DecisionValue; commit: boolean }) {
+/** Our choice against the other option, minus = our choice gained: the bar spans ±10 s, gain to the left; DSQ is named, not counted in seconds */
+function Verdict({ val, commit, late }: { val: DecisionValue; commit: boolean; late: boolean }) {
   const t = useT()
   const chosen = commit ? val.pit : val.stay
   const other = commit ? val.stay : val.pit
-  const diff = chosen.mean - other.mean // minus = our choice was faster
+  const either = chosen.dsq === 1 && other.dsq === 1
+  const byDsq = Math.abs(chosen.dsq - other.dsq) >= 0.5 // DSQ in one option only: the seconds would be its 600
+  const diff = byDsq ? chosen.dsq - other.dsq : chosen.mean - other.mean // minus = our choice was faster
   const se = Math.sqrt(chosen.sd ** 2 / chosen.n + other.sd ** 2 / other.n)
-  const even = Math.abs(diff) < Math.max(0.5, 2 * se)
-  const w = Math.min(1, Math.abs(diff) / 10) * 50
+  const even = either || (!byDsq && Math.abs(diff) < Math.max(0.5, 2 * se))
+  const w = byDsq ? 50 : Math.min(1, Math.abs(diff) / 10) * 50
   return (
     <span className="flex items-center gap-3">
       <span className="relative h-1.5 w-24 shrink-0 rounded-full bg-track max-lg:hidden" aria-hidden>
@@ -373,7 +376,10 @@ function Verdict({ val, commit }: { val: DecisionValue; commit: boolean }) {
         )}
       </span>
       <span className={cn(even ? 'text-muted-foreground' : diff < 0 ? 'text-ok' : 'text-hot')}>
-        {even ? t.noDifference : diff < 0 ? t.rightCall(fmtS(diff)) : t.betterWas(commit, fmtS(diff))}
+        {either ? t.dsqEither : even ? t.noDifference
+          : byDsq ? t.dsqOther(diff < 0 ? undefined : commit)
+          // late: staying out only paid off because the bot then boxed a lap later
+          : diff < 0 ? (late && !commit ? t.rightIfLater(fmtS(diff)) : t.rightCall(fmtS(diff))) : t.betterWas(commit, fmtS(diff))}
       </span>
     </span>
   )

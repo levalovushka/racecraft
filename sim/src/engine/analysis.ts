@@ -1,5 +1,5 @@
 import { hash } from './rng'
-import { classOf, cloneRace, createRace, P, penalties, results, runToEnd, type Decision, type Race, type Settings } from './race'
+import { classOf, cloneRace, createRace, P, penalties, results, runToEnd, step, type Decision, type Race, type Settings } from './race'
 import { expectedWait, hunger, queueBefore, ribbon, stintInfo } from './ai'
 import type { Track } from './track'
 
@@ -36,6 +36,7 @@ export interface OptionValue {
   sd: number
   pos: number // mean finishing position
   n: number
+  dsq: number // share of the runs that ended in DSQ, 0..1
 }
 
 export interface DecisionValue {
@@ -43,28 +44,39 @@ export interface DecisionValue {
   stay: OptionValue
 }
 
-/** Monte Carlo from the decision point: both options, our driver then played by the bot; onRun ticks after every continuation */
-export function evaluateDecision(dec: Decision, n = 24, onRun?: (done: number, of: number) => void): DecisionValue {
+/**
+ * Monte Carlo from the decision point: both options, our driver then played by the bot; onRun ticks after every continuation.
+ * `until`: the last lap of a run of stay-out calls — the stay option stays out through it before the bot takes over.
+ */
+export function evaluateDecision(dec: Decision, n = 24, onRun?: (done: number, of: number) => void, until = dec.lap): DecisionValue {
   let done = 0
   const run = (commit: boolean): OptionValue => {
     const xs: number[] = []
     let pos = 0
+    let dsq = 0
     for (let k = 0; k < n; k++) {
       const c = cloneRace(dec.snapshot)
-      c.ourPolicy = 'bot'
       c.recordDecisions = false
       c.drivers[0].commit = commit
       c.noiseSeed = hash(c.settings.seed, 7777, k)
       c.noiseFrom = dec.lap + 1
+      if (!commit) {
+        // the manager's standing order to stay out, as in the race
+        c.ourPolicy = 'manager'
+        c.intent = 'stay'
+        while (!c.finished && c.drivers[0].lapsDone < until) step(c, P.dt * 2)
+      }
+      c.ourPolicy = 'bot'
       runToEnd(c, P.dt * 2)
       const o = ourOutcome(c)
       xs.push(score(o, c))
       pos += o.pos
+      dsq += +o.dsq
       onRun?.(++done, 2 * n)
     }
     const mean = xs.reduce((a, b) => a + b, 0) / n
     const sd = Math.sqrt(xs.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, n - 1))
-    return { mean, sd, pos: pos / n, n }
+    return { mean, sd, pos: pos / n, n, dsq: dsq / n }
   }
   return { pit: run(true), stay: run(false) }
 }
