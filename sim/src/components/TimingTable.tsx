@@ -39,6 +39,8 @@ export function TimingTable({ race, onChange }: { race: Race; onChange: () => vo
       <tbody>
         {rows.map(({ d, pos, stats: s, gap }) => {
           const out = d.pitsDone >= N
+          // too few stops once the box is closed: DSQ, as in results(); a stop under way counts
+          const dsq = (race.flag || d.mode === 'done') && d.pitsDone + (d.mode === 'laneIn' || d.mode === 'wait' ? 1 : 0) < N
           const status = publicStatus(race, d)
           const deadline = !out && d.mode === 'track' && stintInfo(race, d).margin <= 3
           const isUs = d === me
@@ -58,7 +60,7 @@ export function TimingTable({ race, onChange }: { race: Race; onChange: () => vo
               <td className={cn(TD, 'text-right')}>{fmtLap(s.best)}</td>
               <td className={cn(TD, 'text-right text-muted-foreground')}>{fmtLap(s.avg)}</td>
               <td className={cn(TD, 'text-right', deadline && 'text-hot')}>{Math.max(0, d.lapsDone - d.stints[d.stints.length - 1].start)}</td>
-              <td className={cn(TD, 'text-right', out && 'text-muted-foreground')}>{d.pitsDone}/{N}</td>
+              <td className={cn(TD, 'text-right', dsq ? 'text-hot' : out && 'text-muted-foreground')}>{d.pitsDone}/{N}</td>
               <td title={statusText(t, status)} className={cn(TD, 'truncate pl-5 font-normal', status.kind === 'burning' ? 'text-hot' : 'text-muted-foreground')}>{statusText(t, status)}</td>
             </tr>
           )
