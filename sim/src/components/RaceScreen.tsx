@@ -137,7 +137,8 @@ function RaceState({ race }: { race: Race }) {
   return (
     <div className="flex items-baseline gap-4 tnum">
       <span className="font-semibold">
-        {race.flag ? t.flag : <>{t.lap} {lap} <span className="font-normal text-muted-foreground">{t.of} {n}</span></>}
+        {/* the flag only once we are across the line: until then we still race our last lap */}
+        {us(race).mode === 'done' ? t.flag : <>{t.lap} {lap} <span className="font-normal text-muted-foreground">{t.of} {n}</span></>}
       </span>
       <span className="w-14 text-muted-foreground">{fmtTime(race.t)}</span>
     </div>
@@ -176,6 +177,9 @@ function YouPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void
   const out = me.pitsDone >= s.pits
   const latest = s.laps - (s.pits - me.pitsDone) * s.minStint
   const virtual = virtualOrder(race, rows).get(me.id)!
+  // too few stops once the box is closed: DSQ, as in results(); a stop under way counts
+  const made = me.pitsDone + (me.mode === 'laneIn' || me.mode === 'wait' ? 1 : 0)
+  const dsq = (race.flag || me.mode === 'done') && made < s.pits
   // two drivers either side; the outer pair only where the screen is tall enough
   const around = [-2, -1, 0, 1, 2].map((k) => ({ k, r: rows[i + k] })).filter((x) => x.r)
 
@@ -200,9 +204,12 @@ function YouPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void
       <h2 className="sr-only">{t.you}</h2>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-display font-medium tnum short:text-[2.5rem]">P{mine.pos}</div>
-          <div className="mt-2 text-sm text-muted-foreground tnum short:mt-1" title={me.mode === 'done' || race.flag ? undefined : t.afterStopsHint}>
-            {me.mode === 'done' || race.flag ? t.finalOrder : <><span className="text-foreground">P{virtual}</span> {t.afterStops}</>}
+          <div className={cn('text-display font-medium tnum short:text-[2.5rem]', dsq && 'text-hot')}>{dsq ? 'DSQ' : `P${mine.pos}`}</div>
+          <div className={cn('mt-2 text-sm tnum short:mt-1', dsq ? 'text-hot' : 'text-muted-foreground')} title={race.flag ? undefined : t.afterStopsHint}>
+            {dsq ? t.dsqNote(me.pitsDone, s.pits)
+              : me.mode === 'done' ? t.finalOrder
+              : race.flag ? t.finalLap
+              : <><span className="text-foreground">P{virtual}</span> {t.afterStops}</>}
           </div>
         </div>
         <Kart size="lg" label={race.karts[me.kart].label} cls={ourClass(race, me.kart)} onClick={() => rerate(me.kart)} />
@@ -244,7 +251,7 @@ function YouPanel({ race, rerate }: { race: Race; rerate: (kart: number) => void
       />
       <div className="mt-2.5 flex justify-between gap-3 text-xs tnum">
         <span className={hot ? 'text-hot' : 'text-muted-foreground'}>{status}</span>
-        <span className="shrink-0 text-muted-foreground">{t.stops} {me.pitsDone}/{s.pits}</span>
+        <span className={cn('shrink-0', dsq ? 'text-hot' : 'text-muted-foreground')}>{t.stops} {me.pitsDone}/{s.pits}</span>
       </div>
     </Panel>
   )
