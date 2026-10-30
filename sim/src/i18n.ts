@@ -180,7 +180,7 @@ const en = {
   evaluatingOne: 'Evaluating',
   evalFailed: "Couldn't evaluate",
   evalAllFailed: "Couldn't evaluate the calls: the calculation failed",
-  callsNote: 'Each call against the other one: 24 race continuations, then the bot drives; minus = gained',
+  callsNote: 'Each call against the other one (a run of laps — on every lap of it): 24 race continuations, then the bot drives; minus = gained',
   nothingToReview: 'Nothing to review: the box never had a better kart and you never stopped.',
   callCols: { lap: 'Lap', situation: 'Situation', kart: 'Kart', red: 'Red', margin: 'Margin', call: 'Call', verdict: 'Verdict' },
   marginLate: (n: number) => `${n} ${PLURAL.en.select(n) === 'one' ? 'lap' : 'laps'} late`,
@@ -188,7 +188,10 @@ const en = {
   callText: { box: 'Box', stay: 'Stay out', clearIn: 'Box if clear → stopped', clearOut: 'Box if clear → stayed out' },
   noDifference: 'No difference',
   rightCall: (x: string) => `Right call, ${x} s`,
+  rightIfLater: (x: string) => `Right call, ${x} s — if boxing a lap later`,
   betterWas: (stay: boolean, x: string) => `${stay ? 'Staying out' : 'Boxing'} was better, ${x} s`,
+  dsqEither: 'DSQ either way',
+  dsqOther: (stay?: boolean) => `${stay === undefined ? 'Right call' : `${stay ? 'Staying out' : 'Boxing'} was better`} — DSQ otherwise`,
   to: 'to',
 }
 
@@ -355,7 +358,7 @@ const ru: Dict = {
   evaluatingOne: 'Оценка',
   evalFailed: 'Не удалось оценить',
   evalAllFailed: 'Не удалось оценить решения: расчёт упал',
-  callsNote: 'Каждое решение против другого: 24 продолжения гонки, дальше за вас едет бот; минус — выиграно',
+  callsNote: 'Каждое решение против другого (строка кругов — на всех её кругах): 24 продолжения гонки, дальше за вас едет бот; минус — выиграно',
   nothingToReview: 'Нечего разбирать: в боксе не было карта лучше вашего, и вы не заезжали.',
   callCols: { lap: 'Круг', situation: 'Ситуация', kart: 'Карт', red: 'Красный', margin: 'Запас', call: 'Решение', verdict: 'Оценка' },
   marginLate: (n) => `опоздание ${n} кр.`,
@@ -363,7 +366,10 @@ const ru: Dict = {
   callText: { box: 'Бокс', stay: 'Мимо', clearIn: 'Бокс, если чисто → заехали', clearOut: 'Бокс, если чисто → проехали' },
   noDifference: 'Разницы нет',
   rightCall: (x) => `Верно, ${x} с`,
+  rightIfLater: (x) => `Верно, ${x} с — если заехать кругом позже`,
   betterWas: (stay, x) => `Лучше было ${stay ? 'проехать' : 'заехать'}, ${x} с`,
+  dsqEither: 'DSQ при любом выборе',
+  dsqOther: (stay) => `${stay === undefined ? 'Верно' : `Лучше было ${stay ? 'проехать' : 'заехать'}`} — иначе DSQ`,
   to: 'на',
 }
 

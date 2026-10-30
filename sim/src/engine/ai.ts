@@ -114,7 +114,9 @@ export function hunger(r: Race, d: Driver, perceived: number[], publicOnly = fal
 export function aiWantsPit(r: Race, d: Driver): boolean {
   if (d.pitsDone >= r.settings.pits) return false
   const si = stintInfo(r, d)
-  if (!si.eligible) return false
+  // standing in for us (decision review, bot comparison): no room left for the stops — a short stint and its penalty beat DSQ.
+  // Rivals keep waiting out the minimum stint
+  if (!si.eligible) return d.isUs && r.ourPolicy === 'bot' && si.margin < 0
   const queue = queueBefore(r, d)
   const urg = urgency(r, d, si)
   if (urg <= 1 + d.buffer) {
